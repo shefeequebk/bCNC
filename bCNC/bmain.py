@@ -76,6 +76,7 @@ from ControlPage import ControlPage
 from EditorPage import EditorPage
 from FilePage import FilePage
 from ProbePage import ProbePage
+from SurfAlignPage import SurfAlignPage
 from Sender import NOT_CONNECTED, STATECOLOR, STATECOLORDEF, Sender
 from TerminalPage import TerminalPage
 from ToolsPage import Tools, ToolsPage
@@ -245,6 +246,7 @@ class Application(Tk, Sender):
             EditorPage,
             FilePage,
             ProbePage,
+            SurfAlignPage,
             TerminalPage,
             ToolsPage,
         ):
@@ -301,6 +303,7 @@ class Application(Tk, Sender):
 
         # Left side
         for name in Utils.getStr(Utils.__prg__, "ribbon").split():
+            # print("Ribbon name: ", name)
             last = name[-1]
             if last == ">":
                 name = name[:-1]

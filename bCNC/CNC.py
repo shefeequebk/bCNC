@@ -305,6 +305,23 @@ class Probe:
         lines.append(f"G0X{self.xmin:.4f}Y{self.ymin:.4f}")
         return lines
 
+    def multi_point_scan(self, probe_points):
+        lines = []
+        lines.append(f"G0Z{CNC.vars['safe']:.4f}")
+        lines.append(f"G0X{self.xmin:.4f}Y{self.ymin:.4f}")
+        for point in probe_points:
+            lines.append(f"G0Z{self.zmax:.4f}")
+            lines.append(f"G0X{point[0]:.4f}Y{point[1]:.4f}")
+            lines.append("%wait")  # added for smoothie
+            lines.append(
+                f"{CNC.vars['prbcmd']}Z{self.zmin:.4f}"
+            )
+            lines.append("%wait")  # added for smoothie
+        lines.append(f"G0Z{self.zmax:.4f}")
+        lines.append(f"G0X{self.xmin:.4f}Y{self.ymin:.4f}")
+        return lines
+    
+    
     # ----------------------------------------------------------------------
     # Add a probed point to the list and the 3D matrix
     # ----------------------------------------------------------------------

@@ -8,6 +8,10 @@ import os
 import re
 import types
 
+import numpy as np
+from scipy.spatial import distance_matrix
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import undo
 import Unicode
 from bmath import (
@@ -475,7 +479,76 @@ class Probe:
         segments.append((x2, y2, z2 + self.interpolate(x2, y2)))
         return segments
 
+    def make_line_segments(self, x1, y1, z1, x2, y2, z2, step_size):
+        dx = x2 - x1
+        dy = y2 - y1
+        dz = z2 - z1
 
+        if abs(dx) < 1e-10:
+            dx = 0.0
+        if abs(dy) < 1e-10:
+            dy = 0.0
+        if abs(dz) < 1e-10:
+            dz = 0.0
+
+        if dx == 0.0 and dy == 0.0:
+            return [(x2, y2, z2)]
+
+        # Length along projection on X-Y plane
+        rxy = math.sqrt(dx * dx + dy * dy)
+        dx /= rxy  # direction cosines along XY plane
+        dy /= rxy
+        dz /= rxy  # add correction for the slope in Z, versus the travel in XY
+
+        i = int(math.floor((x1 - self.xmin) / step_size))
+        j = int(math.floor((y1 - self.ymin) / step_size))
+        if dx > 1e-10:
+            tx = (
+                float(i + 1) * step_size + self.xmin - x1
+            ) / dx  # distance to next cell
+            tdx = step_size / dx
+        elif dx < -1e-10:
+            # distance to next cell
+            tx = (float(i) * step_size + self.xmin - x1) / dx
+            tdx = -step_size / dx
+        else:
+            tx = 1e10
+            tdx = 0.0
+
+        if dy > 1e-10:
+            ty = (
+                float(j + 1) * step_size + self.ymin - y1
+            ) / dy  # distance to next cell
+            tdy = step_size / dy
+        elif dy < -1e-10:
+            # distance to next cell
+            ty = (float(j) * step_size + self.ymin - y1) / dy
+            tdy = -step_size / dy
+        else:
+            ty = 1e10
+            tdy = 0.0
+
+        segments = []
+        rxy *= 0.999999999  # just reduce a bit to avoid precision errors
+        while tx < rxy or ty < rxy:
+            if tx == ty:
+                t = tx
+                tx += tdx
+                ty += tdy
+            elif tx < ty:
+                t = tx
+                tx += tdx
+            else:
+                t = ty
+                ty += tdy
+            x = x1 + t * dx
+            y = y1 + t * dy
+            z = z1 + t * dz
+            segments.append((x, y, z))
+
+        segments.append((x2, y2, z2))
+        return segments
+        
 # =============================================================================
 # contains a list of machine points vs position in the gcode
 # calculates the transformation matrix (rotation + translation) needed
@@ -5282,3 +5355,196 @@ class GCode:
                 add("".join(newcmd), (i, j))
 
         return paths
+    
+    def plot_cutting_points(self, x_coords, y_coords, z_coords):
+        # Plotting the coordinates
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.scatter(x_coords, y_coords, z_coords, c='b', marker='o')
+        ax.set_xlabel('X Coordinate')
+        ax.set_ylabel('Y Coordinate')
+        ax.set_zlabel('Z Coordinate')
+        plt.title('Cutting Points 3D Plot')
+
+        # Mark each coordinate with its (x, y, z) value
+        for i in range(len(x_coords)):
+            ax.text(x_coords[i], y_coords[i], z_coords[i], f'({x_coords[i]:.2f}, {y_coords[i]:.2f}, {z_coords[i]:.2f})', size=8, zorder=1)
+
+        plt.show()
+    
+    def make_cutting_points(self):
+
+        x_coords = []
+        y_coords = []
+        z_coords = []
+
+        for bid, block in enumerate(self.blocks):
+            # print("Block", bid)
+            for line in block:
+                # print("Line", line)
+                cmds = CNC.compileLine(line)
+                # print("cmds", cmds)  
+                if cmds is None:
+                    continue
+                elif isinstance(cmds, str):
+                    cmds = CNC.breakLine(cmds)
+                else:
+                    continue
+                self.cnc.motionStart(cmds)
+                # print("GCODE", self.cnc.gcode)
+                if self.cnc.gcode == 1:
+                    xyz = self.cnc.motionPath()
+                    if not xyz:
+                        continue
+                    x1, y1, z1 = xyz[0]
+                    for x2, y2, z2 in xyz[1:]:
+                        segments = self.probe.make_line_segments(x1, y1, z1, x2, y2, z2, 1)
+                        for x, y, z in segments:
+                            x_coords.append(x)
+                            y_coords.append(y)
+                            z_coords.append(z)
+                        
+                self.cnc.motionEnd()
+
+        self.plot_cutting_points(x_coords, y_coords, z_coords)
+        
+        return x_coords, y_coords, z_coords
+
+    def min_max_distance_k_centers_by_points(self, points, k):
+        """
+        Selects k centers from points such that the maximum distance
+        between a point and its nearest center is minimized.
+
+        :param points: List of (x, y) coordinates.
+        :param k: Number of centers to find.
+        :return: List of k center points.
+        """
+        points = np.array(points)
+        num_points = len(points)
+
+        # Compute pairwise distance matrix
+        dist_matrix = distance_matrix(points, points)
+
+        # Step 1: Start with a random center
+        selected_centers = [0]  # Select first center as the first point
+
+        # Step 2: Iteratively select centers that maximize min-distance
+        for _ in range(1, k):
+            # Compute min-distance of each point to the selected centers
+            min_distances = np.min(dist_matrix[selected_centers], axis=0)
+
+            # Find the point farthest from existing centers
+            new_center = np.argmax(min_distances)
+            selected_centers.append(new_center)
+
+        return points[selected_centers]
+
+
+    def find_optimal_centers_by_rectangle(self, rectangle, candidate_centers, k):
+        """
+        Selects k centers from candidate centers that minimize the max distance required
+        to cover the entire given rectangular area.
+
+        :param rectangle: (x_min, y_min, x_max, y_max) defining the area to be covered.
+        :param candidate_centers: List of (x, y) coordinates that can be used as centers.
+        :param k: Number of centers to find.
+        :return: List of k center points that optimally cover the area.
+        """
+        candidate_centers = np.array(candidate_centers)
+
+        # Step 1: Compute distance matrix
+        dist_matrix = distance_matrix(candidate_centers, candidate_centers)
+
+        # Step 2: Start with a center near the middle of the rectangle
+        rect_x_mid = (rectangle[0] + rectangle[2]) / 2
+        rect_y_mid = (rectangle[1] + rectangle[3]) / 2
+        start_idx = np.argmin(np.linalg.norm(candidate_centers - [rect_x_mid, rect_y_mid], axis=1))
+
+        selected_centers = [start_idx]
+
+        # Step 3: Iteratively pick centers that cover the largest remaining area
+        for _ in range(1, k):
+            min_distances = np.min(dist_matrix[selected_centers], axis=0)
+            new_center = np.argmax(min_distances)  # Farthest uncovered point
+            selected_centers.append(new_center)
+
+        return candidate_centers[selected_centers]
+
+
+
+    def plot_results_by_points(self, points, best_centers):
+        # Plot results
+        fig, ax = plt.subplots()
+        ax.scatter(points[:, 0], points[:, 1], color='blue', label="Points")
+        ax.scatter(best_centers[:, 0], best_centers[:, 1], color='red', marker='x', s=100, label="Selected Centers")
+
+        # Draw circles covering all points with the max min-distance
+        max_radius = max(np.min(distance_matrix(best_centers, points), axis=0))
+
+        for center in best_centers:
+            circle = plt.Circle(center, max_radius, color='black', fill=False, linestyle='dashed')
+            ax.add_patch(circle)
+
+        ax.set_xlabel("X Axis")
+        ax.set_ylabel("Y Axis")
+        ax.legend()
+        plt.show()
+
+    def plot_rectangle_and_centers(self, rectangle, candidate_centers, optimal_centers):
+        # Plot the results
+        fig, ax = plt.subplots()
+
+        # Plot rectangle
+        rect = plt.Rectangle((rectangle[0], rectangle[1]), rectangle[2] - rectangle[0], rectangle[3] - rectangle[1],
+                             linewidth=2, edgecolor='black', facecolor='none', label="Target Rectangle")
+        ax.add_patch(rect)
+
+        # Plot candidate points
+        ax.scatter(candidate_centers[:, 0], candidate_centers[:, 1], color='blue', alpha=0.5, label="Candidate Points")
+
+        # Plot selected centers
+        ax.scatter(optimal_centers[:, 0], optimal_centers[:, 1], color='red', marker='x', s=100, label="Selected Centers")
+
+        # Compute max radius (distance from centers to nearest edge)
+        max_radius = max(np.min(distance_matrix(optimal_centers, candidate_centers), axis=0))
+
+        # Draw coverage circles
+        for center in optimal_centers:
+            circle = plt.Circle(center, max_radius, color='green', fill=False, linestyle='dashed')
+            ax.add_patch(circle)
+
+        ax.set_xlabel("X Axis")
+        ax.set_ylabel("Y Axis")
+        ax.legend()
+        plt.show()
+
+    def test_print_function(self):
+        print("Test Print Function")
+        x_coords, y_coords, z_coords = self.make_cutting_points()
+        x_min, x_max = np.min(x_coords), np.max(x_coords)
+        y_min, y_max = np.min(y_coords), np.max(y_coords)
+        points = np.array([(x, y) for x, y in zip(x_coords, y_coords)])
+        k = 5  # Number of circles
+
+        optimal_centers = self.min_max_distance_k_centers_by_points(points, k)
+
+        # Call the new plotting function
+        self.plot_results_by_points(points, optimal_centers)
+        
+        # Find the optimal centers by rectangle
+        rectangle = (x_min, y_min, x_max, y_max)
+        
+        optimal_centers = self.find_optimal_centers_by_rectangle(rectangle, points, k)
+
+        # Call the new plotting function
+        self.plot_rectangle_and_centers(rectangle, points, optimal_centers)
+
+
+
+
+
+
+
+
+
+

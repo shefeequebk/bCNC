@@ -498,6 +498,12 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         generate_b = Button(frame, text=_("Generate"), command=self.generateGcode, padx=2, pady=1)
         generate_b.grid(row=row, column=col, sticky=EW)
         self.addWidget(generate_b)
+        
+        row += 1
+        col = 0
+        test_b = Button(frame, text=_("Test"), command=self.app.gcode.test_print_function, padx=2, pady=1)
+        test_b.grid(row=row, column=col, sticky=EW)
+        self.addWidget(test_b)
 
 
 

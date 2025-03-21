@@ -42,6 +42,7 @@ from tkinter import (
     Spinbox,
     LabelFrame,
     messagebox,
+    Radiobutton,
 )
 
 import Camera
@@ -51,7 +52,7 @@ import tkExtra
 import Utils
 from CNC import CNC, Block
 import os
-from SurfAlignUtils import parse_gcode, setup_blender_scene, get_probe_points, plot_probe_points
+from SurfAlignUtils import setup_blender_scene
 from Helpers import N_
 
 __author__ = Utils.__author__
@@ -499,11 +500,6 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         generate_b.grid(row=row, column=col, sticky=EW)
         self.addWidget(generate_b)
         
-        row += 1
-        col = 0
-        test_b = Button(frame, text=_("Test"), command=self.app.gcode.test_print_function, padx=2, pady=1)
-        test_b.grid(row=row, column=col, sticky=EW)
-        self.addWidget(test_b)
 
 
 
@@ -610,6 +606,24 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         tkExtra.Balloon.set(
             self.mp_z_max, _("Z safe to move"))
         
+        # feed command
+        row += 1
+        col = 0
+        Label(frame,
+              text=_("Probe Coverage Method")).grid(row=row, column=col, sticky=E)
+        col += 1
+        self.probe_coverage_methods = ["EvenCoverage", "AreaCoverage"]
+        self.probe_coverage_method = tkExtra.Combobox(
+            frame,
+            True,
+            background=tkExtra.GLOBAL_CONTROL_BACKGROUND,
+            width=16,
+        )
+        self.probe_coverage_method.grid(row=row, column=col, sticky=EW)
+        self.probe_coverage_method.fill(self.probe_coverage_methods)
+        self.probe_coverage_method.set("EvenCoverage")
+        self.addWidget(self.probe_coverage_method)
+
         row += 1
         col = 0
         probe_generate_b = Button(frame, text=_("Generate Probe"), command=self.generate_probe)
@@ -637,25 +651,19 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         
     
     def generate_probe(self):
-        n_probe_points = int(float(self.n_probe_points.get()))
         
-        print("Generate Probe", self.app.gcode.filename, "No. of Points", n_probe_points)
-        gcode_file_path = self.app.gcode.filename
-        
-        # Check if the G-code file exists
-        if not os.path.isfile(gcode_file_path):
-            messagebox.showwarning(_("G-code error"), _("The G-code does not loaded or file does not exist"))
-            return  # Exit the method if the file does not exist
-        
-        z_layers = parse_gcode(gcode_file_path)
-        print("Z LAYERS PARSED")
-        probe_points, hull_points, min_z, bottom_layer_points, hull = get_probe_points(z_layers, n_probe_points=n_probe_points)
-        print("PROBE POINTS GENERATED")
-        plot_probe_points(z_layers, probe_points, min_z, bottom_layer_points, hull)
-        self.probe_points = probe_points
+        no_of_points = int(float(self.n_probe_points.get()))
+        if no_of_points < 3:
+            messagebox.showwarning(_("Probe error"), _("Number of probe points must be greater than 2"))
+            return
+
+        self.probe_points = self.app.gcode.generate_and_plot_probing_points(method=self.probe_coverage_method.get(), k=no_of_points)
         
     def show_probe_points(self):
         """Display a popup window with the probe points."""
+        if len(self.probe_points) == 0:
+            messagebox.showwarning(_("Probe error"), _("No probe points found"))
+            return
         popup = tkExtra.ExLabelFrame(self, text=_("Probe Points"), foreground="DarkBlue")
         popup.pack(side=TOP, fill=X)
 

@@ -6,6 +6,7 @@
 import math
 import os
 import re
+from tkinter import messagebox
 import types
 
 import numpy as np
@@ -2391,6 +2392,7 @@ class GCode:
         self.probe = Probe()
         self.orient = Orient()
         self.vars = {}  # local variables
+        self.surf_align_probe_points = []
         self.init()
 
     # ----------------------------------------------------------------------
@@ -5406,7 +5408,7 @@ class GCode:
                         
                 self.cnc.motionEnd()
 
-        self.plot_cutting_points(x_coords, y_coords, z_coords)
+        # self.plot_cutting_points(x_coords, y_coords, z_coords)
         
         return x_coords, y_coords, z_coords
 
@@ -5473,71 +5475,61 @@ class GCode:
 
 
     def plot_results_by_points(self, points, best_centers):
-        # Plot results
         fig, ax = plt.subplots()
         ax.scatter(points[:, 0], points[:, 1], color='blue', label="Points")
         ax.scatter(best_centers[:, 0], best_centers[:, 1], color='red', marker='x', s=100, label="Selected Centers")
-
-        # Draw circles covering all points with the max min-distance
         max_radius = max(np.min(distance_matrix(best_centers, points), axis=0))
-
         for center in best_centers:
             circle = plt.Circle(center, max_radius, color='black', fill=False, linestyle='dashed')
             ax.add_patch(circle)
-
         ax.set_xlabel("X Axis")
         ax.set_ylabel("Y Axis")
         ax.legend()
         plt.show()
 
     def plot_rectangle_and_centers(self, rectangle, candidate_centers, optimal_centers):
-        # Plot the results
         fig, ax = plt.subplots()
-
-        # Plot rectangle
         rect = plt.Rectangle((rectangle[0], rectangle[1]), rectangle[2] - rectangle[0], rectangle[3] - rectangle[1],
                              linewidth=2, edgecolor='black', facecolor='none', label="Target Rectangle")
         ax.add_patch(rect)
-
-        # Plot candidate points
         ax.scatter(candidate_centers[:, 0], candidate_centers[:, 1], color='blue', alpha=0.5, label="Candidate Points")
-
-        # Plot selected centers
         ax.scatter(optimal_centers[:, 0], optimal_centers[:, 1], color='red', marker='x', s=100, label="Selected Centers")
-
-        # Compute max radius (distance from centers to nearest edge)
         max_radius = max(np.min(distance_matrix(optimal_centers, candidate_centers), axis=0))
-
-        # Draw coverage circles
         for center in optimal_centers:
             circle = plt.Circle(center, max_radius, color='green', fill=False, linestyle='dashed')
             ax.add_patch(circle)
-
         ax.set_xlabel("X Axis")
         ax.set_ylabel("Y Axis")
         ax.legend()
         plt.show()
 
-    def test_print_function(self):
-        print("Test Print Function")
+    def generate_and_plot_probing_points(self, method="EvenCoverage", k=5):
+        print("Generating Probing Points")
         x_coords, y_coords, z_coords = self.make_cutting_points()
+        if len(x_coords) == 0 or len(y_coords) == 0:
+            messagebox.showwarning(_("Probe error"), _("No cutting points found"))
+            return
         x_min, x_max = np.min(x_coords), np.max(x_coords)
         y_min, y_max = np.min(y_coords), np.max(y_coords)
         points = np.array([(x, y) for x, y in zip(x_coords, y_coords)])
-        k = 5  # Number of circles
-
-        optimal_centers = self.min_max_distance_k_centers_by_points(points, k)
-
-        # Call the new plotting function
-        self.plot_results_by_points(points, optimal_centers)
         
-        # Find the optimal centers by rectangle
-        rectangle = (x_min, y_min, x_max, y_max)
+        if method == "EvenCoverage":
+            optimal_centers = self.min_max_distance_k_centers_by_points(points, k)
+            self.surf_align_probe_points = optimal_centers
+            # Call the new plotting function
+            self.plot_results_by_points(points, optimal_centers)
         
-        optimal_centers = self.find_optimal_centers_by_rectangle(rectangle, points, k)
+        elif method == "AreaCoverage":
+            # Find the optimal centers by rectangle
+            rectangle = (x_min, y_min, x_max, y_max)
+            
+            optimal_centers = self.find_optimal_centers_by_rectangle(rectangle, points, k)
+            self.surf_align_probe_points = optimal_centers
+            # Call the new plotting function
+            self.plot_rectangle_and_centers(rectangle, points, optimal_centers)
+            
+        return optimal_centers
 
-        # Call the new plotting function
-        self.plot_rectangle_and_centers(rectangle, points, optimal_centers)
 
 
 

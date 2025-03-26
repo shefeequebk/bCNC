@@ -149,6 +149,10 @@ class Probe:
         self.zeroed = False  # if probe was zeroed at any location
         self.start = False  # start collecting probes
         self.saved = False
+        # Multi-point scan variables
+        self.is_multi_point_scan = False
+        self.multi_probe_points = []
+        self.no_of_points = 0
 
     # ----------------------------------------------------------------------
     def clear(self):
@@ -311,7 +315,12 @@ class Probe:
         return lines
 
     def multi_point_scan(self, probe_points):
+        self.clear()
+        self.start = True
+        self.makeMatrix()
+        self.is_multi_point_scan = True
         lines = []
+        self.no_of_points = len(probe_points)
         lines.append(f"G0Z{CNC.vars['safe']:.4f}")
         lines.append(f"G0X{self.xmin:.4f}Y{self.ymin:.4f}")
         for point in probe_points:
@@ -333,30 +342,37 @@ class Probe:
     def add(self, x, y, z):
         if not self.start:
             return
-        i = round((x - self.xmin) / self._xstep)
-        if i < 0.0 or i > self.xn:
-            return
+        if not self.is_multi_point_scan:
+            i = round((x - self.xmin) / self._xstep)
+            if i < 0.0 or i > self.xn:
+                return
 
-        j = round((y - self.ymin) / self._ystep)
-        if j < 0.0 or j > self.yn:
-            return
+            j = round((y - self.ymin) / self._ystep)
+            if j < 0.0 or j > self.yn:
+                return
 
-        rem = abs(x - (i * self._xstep + self.xmin))
-        if rem > self._xstep / 10.0:
-            return
+            rem = abs(x - (i * self._xstep + self.xmin))
+            if rem > self._xstep / 10.0:
+                return
 
-        rem = abs(y - (j * self._ystep + self.ymin))
-        if rem > self._ystep / 10.0:
-            return
+            rem = abs(y - (j * self._ystep + self.ymin))
+            if rem > self._ystep / 10.0:
+                return
 
-        try:
-            self.matrix[int(j)][int(i)] = z
-            self.points.append([x, y, z])
-        except IndexError:
-            pass
+            try:
+                self.matrix[int(j)][int(i)] = z
+                self.points.append([x, y, z])
+            except IndexError:
+                pass
 
-        if len(self.points) >= self.xn * self.yn:
-            self.start = False
+            if len(self.points) >= self.xn * self.yn:
+                self.start = False
+        else:
+            self.multi_probe_points.append([x, y, z])
+            if len(self.multi_probe_points) >= self.no_of_points:
+                self.start = False
+                self.is_multi_point_scan = False
+            print("Multi-point scan points: ", self.multi_probe_points)
 
     # ----------------------------------------------------------------------
     # Make z-level relative to the location of (x,y,0)
@@ -479,7 +495,100 @@ class Probe:
 
         segments.append((x2, y2, z2 + self.interpolate(x2, y2)))
         return segments
+    
+    
+    def calculate_z_from_poly(self, X, Y, coeffs, degree):
+        Z = 0.0
+        index = 0
+        print("Degree:", degree, "Coeff:", coeffs, "X:", X, "Y:", Y)
+        for i in range(degree + 1):
+            for j in range(degree + 1 - i):
+                print("ADDING Z VLAUE", Z, "Degree:", degree, "Index:", index, "Coeff:", coeffs, "X:", X, "Y:", Y)
+                Z += coeffs[index] * (X ** i) * (Y ** j)
+                index += 1
+        return Z  # Add 1 if you want a vertical offset
+    
+    def splitLine_surf_align(self, x1, y1, z1, x2, y2, z2, poly_plane_coeffs, poly_plane_degree, step_size):
+        print("Split Line Surf Align", x1, y1, z1, x2, y2, z2, poly_plane_coeffs, poly_plane_degree, step_size)
+        dx = x2 - x1
+        dy = y2 - y1
+        dz = z2 - z1
 
+        if abs(dx) < 1e-10:
+            dx = 0.0
+        if abs(dy) < 1e-10:
+            dy = 0.0
+        if abs(dz) < 1e-10:
+            dz = 0.0
+
+        if dx == 0.0 and dy == 0.0:
+            print("x2: ", x2, "y2: ", y2, "poly_plane_coeffs: ", poly_plane_coeffs.tolist())
+            z2 = self.calculate_z_from_poly(x2, y2, poly_plane_coeffs.tolist(), poly_plane_degree)
+            print("z2: ", z2)
+            return [(x2, y2, z2)]
+            # return [(x2, y2, z2+1)]
+
+        # Length along projection on X-Y plane
+        rxy = math.sqrt(dx * dx + dy * dy)
+        dx /= rxy  # direction cosines along XY plane
+        dy /= rxy
+        dz /= rxy  # add correction for the slope in Z, versus the travel in XY
+        print("self.xmin: ", self.xmin, "self.ymin: ", self.ymin)
+        i = int(math.floor((x1 - self.xmin) / step_size))
+        j = int(math.floor((y1 - self.ymin) / step_size))
+        print("i: ", i, "j: ", j)
+        if dx > 1e-10:
+            tx = (
+                float(i + 1) * step_size + self.xmin - x1
+            ) / dx  # distance to next cell
+            tdx = step_size / dx
+        elif dx < -1e-10:
+            # distance to next cell
+            tx = (float(i) * step_size + self.xmin - x1) / dx   
+            tdx = -step_size / dx
+        else:
+            tx = 1e10
+            tdx = 0.0
+
+        if dy > 1e-10:
+            ty = (
+                float(j + 1) * step_size + self.ymin - y1
+            ) / dy  # distance to next cell
+            tdy = step_size / dy
+        elif dy < -1e-10:
+            # distance to next cell
+            ty = (float(j) * step_size + self.ymin - y1) / dy
+            tdy = -step_size / dy
+        else:
+            ty = 1e10
+            tdy = 0.0
+        print("tx: ", tx, "ty: ", ty)
+        segments = []
+        rxy *= 0.999999999  # just reduce a bit to avoid precision errors
+        while tx < rxy or ty < rxy:
+            if tx == ty:
+                t = tx
+                tx += tdx
+                ty += tdy
+            elif tx < ty:
+                t = tx
+                tx += tdx
+            else:
+                t = ty
+                ty += tdy
+            x = x1 + t * dx
+            y = y1 + t * dy
+            z = z1 + t * dz
+            print("segments 111: ", x, y, poly_plane_coeffs.tolist())
+            z += self.calculate_z_from_poly(x, y, poly_plane_coeffs.tolist(), poly_plane_degree)
+            # segments.append((x, y, self.calculate_z_from_poly(x, y, poly_plane_coeffs)))
+            segments.append((x, y, z))
+        print("segments 222: ", x2, y2, poly_plane_coeffs.tolist())
+        z2 += self.calculate_z_from_poly(x2, y2, poly_plane_coeffs.tolist(), poly_plane_degree)  
+        # segments.append((x2, y2, self.calculate_z_from_poly(x2, y2, poly_plane_coeffs)))
+        segments.append((x2, y2, z2))
+        return segments
+    
     def make_line_segments(self, x1, y1, z1, x2, y2, z2, step_size):
         dx = x2 - x1
         dy = y2 - y1
@@ -3667,6 +3776,105 @@ class GCode:
             self.addUndo(undoinfo)
 
     # ----------------------------------------------------------------------
+    # Fit G-Code
+    # ----------------------------------------------------------------------
+    def build_vandermonde(self, X, Y, degree):
+        terms = []
+        for i in range(degree + 1):
+            for j in range(degree + 1 - i):
+                terms.append((X ** i) * (Y ** j))
+        return np.vstack(terms).T
+
+
+    def fit_polynomial_surface_numpy(self, points, degree=2):
+        points = np.array(points)
+        X, Y, Z = points[:, 0], points[:, 1], points[:, 2]
+        A = self.build_vandermonde(X, Y, degree)
+        coeffs, *_ = np.linalg.lstsq(A, Z, rcond=None)  # least squares solution
+        return coeffs
+    
+
+    
+    def surf_align_block(self, block, poly_plane_coeffs, poly_plane_degree):
+        new = []
+        # is_multi_point_probe = not self.probe.multi_point_probe.is_empty()
+        is_multi_point_probe = True
+        for line in block:
+            cmds = CNC.compileLine(line)
+            if cmds is None:
+                new.append(line)
+                continue
+            elif isinstance(cmds, str):
+                cmds = CNC.breakLine(cmds)
+            else:
+                new.append(line)
+                continue
+
+            self.cnc.motionStart(cmds)
+            if (is_multi_point_probe and self.cnc.gcode in (0, 1, 2, 3)
+                    and self.cnc.mval == 0):
+                xyz = self.cnc.motionPath()
+                if not xyz:
+                    # while auto-levelling, do not ignore non-movement
+                    # commands, just append the line as-is
+                    new.append(line)
+                else:
+                    extra = ""
+                    for c in cmds:
+                        if (c[0].upper() not in
+                                ("G", "X", "Y", "Z", "I", "J", "K", "R")):
+                            extra += c
+                    x1, y1, z1 = xyz[0]
+                    if self.cnc.gcode == 0:
+                        g = 0
+                    else:
+                        g = 1
+                    for x2, y2, z2 in xyz[1:]:
+                        for x, y, z in self.probe.splitLine_surf_align(x1, y1, z1, x2,
+                                                            y2, z2, poly_plane_coeffs, poly_plane_degree, step_size=1):
+                            # print("SPLIT LINE SURF ALIGN COMPLETED")
+                            # print("CNC UNIT: ", self.cnc.unit)
+                            new.append(
+                                "".join([
+                                    f"G{int(g)}",
+                                    f"{self.fmt('X', x / self.cnc.unit)}",
+                                    f"{self.fmt('Y', y / self.cnc.unit)}",
+                                    f"{self.fmt('Z', z / self.cnc.unit)}",
+                                    extra,
+                                ])
+                            )
+                            extra = ""
+                        x1, y1, z1 = x2, y2, z2
+                self.cnc.motionEnd()
+            else:
+                self.cnc.motionEnd()
+                new.append(line)
+        return new
+    def surf_align_gcode(self, items):
+        print("Surf Align G-Code")
+        sample_points = [
+            [-3.861, 18.207, 0],
+            [4.7, -22.876, -1],
+            [-4.7, -3.686, 0],
+            [4.701, 7.0, -3],
+            [4.701, -11, 2]
+            ]
+        degree = 1
+        poly_plane_coeffs= self.fit_polynomial_surface_numpy(sample_points, degree=degree)
+        print("Poly Plane Coeffs: ", poly_plane_coeffs, "degree: ", degree)
+        undoinfo = []
+        operation = "surf_align"
+        for bid in items:
+            block = self.blocks[bid]
+            if block.name() in ("Header", "Footer"):
+                continue
+            lines = self.surf_align_block(block, poly_plane_coeffs, poly_plane_degree=degree)
+            undoinfo.append(self.addBlockOperationUndo(bid, operation))
+            undoinfo.append(self.setBlockLinesUndo(bid, lines))
+        if undoinfo:
+            self.addUndo(undoinfo)
+
+    # ----------------------------------------------------------------------
     # Return string representation of whole file
     # ----------------------------------------------------------------------
     def __repr__(self):
@@ -5476,14 +5684,15 @@ class GCode:
 
     def plot_results_by_points(self, points, best_centers):
         fig, ax = plt.subplots()
-        ax.scatter(points[:, 0], points[:, 1], color='blue', label="Points")
-        ax.scatter(best_centers[:, 0], best_centers[:, 1], color='red', marker='x', s=100, label="Selected Centers")
+        ax.scatter(points[:, 0], points[:, 1], color='blue',alpha=0.5, s=3, label="Points")
+        ax.scatter(best_centers[:, 0], best_centers[:, 1], color='red', marker='x', s=15, label="Selected Centers")
         max_radius = max(np.min(distance_matrix(best_centers, points), axis=0))
         for center in best_centers:
             circle = plt.Circle(center, max_radius, color='black', fill=False, linestyle='dashed')
             ax.add_patch(circle)
         ax.set_xlabel("X Axis")
         ax.set_ylabel("Y Axis")
+        ax.set_aspect('equal', adjustable='box')
         ax.legend()
         plt.show()
 
@@ -5492,14 +5701,15 @@ class GCode:
         rect = plt.Rectangle((rectangle[0], rectangle[1]), rectangle[2] - rectangle[0], rectangle[3] - rectangle[1],
                              linewidth=2, edgecolor='black', facecolor='none', label="Target Rectangle")
         ax.add_patch(rect)
-        ax.scatter(candidate_centers[:, 0], candidate_centers[:, 1], color='blue', alpha=0.5, label="Candidate Points")
-        ax.scatter(optimal_centers[:, 0], optimal_centers[:, 1], color='red', marker='x', s=100, label="Selected Centers")
+        ax.scatter(candidate_centers[:, 0], candidate_centers[:, 1], color='blue', alpha=0.5, s=3, label="Candidate Points")
+        ax.scatter(optimal_centers[:, 0], optimal_centers[:, 1], color='red', marker='x', s=15, label="Selected Centers")
         max_radius = max(np.min(distance_matrix(optimal_centers, candidate_centers), axis=0))
         for center in optimal_centers:
             circle = plt.Circle(center, max_radius, color='green', fill=False, linestyle='dashed')
             ax.add_patch(circle)
         ax.set_xlabel("X Axis")
         ax.set_ylabel("Y Axis")
+        ax.set_aspect('equal', adjustable='box')
         ax.legend()
         plt.show()
 

@@ -640,6 +640,14 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         probe_generate_b = Button(frame, text=_("Start Probing"), command=self.start_probing)
         probe_generate_b.grid(row=row, column=col, sticky=W)
         self.addWidget(probe_generate_b)
+        
+        row += 1
+        col = 0
+        Label(frame, text=_("Surf Align G-Code:")).grid(row=row, column=col, sticky=E)
+        col += 1
+        surf_align_gcode_b = Button(frame, text=_("Surf Align G-Code"), command=lambda a=app: a.insertCommand("SURF_ALIGN", True))
+        surf_align_gcode_b.grid(row=row, column=col, sticky=W)
+        self.addWidget(surf_align_gcode_b)
 
         frame.grid_columnconfigure(1, weight=1)
         self.loadConfig()

@@ -1466,6 +1466,9 @@ class Application(Tk, Sender):
 
         elif rexx.abbrev("AUTOLEVEL", cmd, 4):
             self.executeOnSelection("AUTOLEVEL", True)
+            
+        elif cmd == "SURF_ALIGN":
+            self.executeOnSelection("SURF_ALIGN", True)
 
         # CAM*ERA: camera actions
         elif rexx.abbrev("CAMERA", cmd, 3):
@@ -1990,6 +1993,8 @@ class Application(Tk, Sender):
         sel = None
         if cmd == "AUTOLEVEL":
             sel = self.gcode.autolevel(items)
+        elif cmd == "SURF_ALIGN":
+            sel = self.gcode.surf_align_gcode(items)
         elif cmd == "CUT":
             sel = self.gcode.cut(items, *args)
         elif cmd == "CLOSE":

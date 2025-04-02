@@ -8,9 +8,19 @@ import matplotlib.pyplot as plt
 import re
 import math
 
+
+# import fabex addon
+import fabex
+
+# Register the addon
+if hasattr(fabex, "register"):
+    fabex.register()
+else:
+    print("No register() function found in addon.")
+
 def setup_blender_scene(engrave_text, text_width_mm, text_height_mm, text_position_mm, rotation_degrees, layer_height_mm, safe_height_mm, save_dir, feedrate_mm, spindle_rpm):
     blend_file_path = os.path.join(save_dir, "output.blend")
-    addon_name = "bl_ext.user_default.fabex"
+    # addon_name = "bl_ext.user_default.fabex"
     
     # Suppress warnings
     warnings.filterwarnings("ignore")
@@ -21,12 +31,12 @@ def setup_blender_scene(engrave_text, text_width_mm, text_height_mm, text_positi
     sys.stderr = open(os.devnull, 'w')
     
     try:
-        # Enable Addon
-        if addon_name not in bpy.context.preferences.addons:
-            bpy.ops.preferences.addon_enable(module=addon_name)
-            print(f"Addon '{addon_name}' enabled successfully.")
-        else:
-            print(f"Addon '{addon_name}' is already enabled.")
+        # # Enable Addon
+        # if addon_name not in bpy.context.preferences.addons:
+        #     bpy.ops.preferences.addon_enable(module=addon_name)
+        #     print(f"Addon '{addon_name}' enabled successfully.")
+        # else:
+        #     print(f"Addon '{addon_name}' is already enabled.")
 
         # Set Render Engine
         bpy.context.scene.render.engine = 'FABEX_RENDER'

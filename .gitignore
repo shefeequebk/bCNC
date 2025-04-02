@@ -13,3 +13,6 @@ build
 
 flatpak/builddir
 flatpak/.flatpak-builder
+bCNC/Op_Text_1.tap
+bCNC/output.blend
+bCNC/output.blend1

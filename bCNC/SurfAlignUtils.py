@@ -27,8 +27,8 @@ def setup_blender_scene(engrave_text, text_width_mm, text_height_mm, text_positi
     
     # Suppress print output
     original_stdout = sys.stdout
-    sys.stdout = open(os.devnull, 'w')
-    sys.stderr = open(os.devnull, 'w')
+    # sys.stdout = open(os.devnull, 'w')
+    # sys.stderr = open(os.devnull, 'w')
     
     try:
         # # Enable Addon

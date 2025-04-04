@@ -2,16 +2,39 @@ import math
 
 import bpy
 import os
+import math
+
+import bpy
+import os
+
+import bpy
+import sys
+import os
+
+# Add the relative path to your custom addon folder
+addon_path = os.path.abspath("cam")
+if addon_path not in sys.path:
+    sys.path.append(addon_path)
+
+# Now import your addon
+import fabex
+
+# Register the addon
+if hasattr(fabex, "register"):
+    fabex.register()
+else:
+    print("No register() function found in addon.")
+
 
 def setup_blender_scene(engrave_text, text_width_mm, text_height_mm, text_position_mm, layer_height_mm, safe_height_mm, feedrate_mm, spindle_rpm):
-    addon_name = "bl_ext.user_default.fabex"
-
-    # Enable Addon
-    if addon_name not in bpy.context.preferences.addons:
-        bpy.ops.preferences.addon_enable(module=addon_name)
-        print(f"Addon '{addon_name}' enabled successfully.")
-    else:
-        print(f"Addon '{addon_name}' is already enabled.")
+    # addon_name = "bl_ext.user_default.fabex"
+    #
+    # # Enable Addon
+    # if addon_name not in bpy.context.preferences.addons:
+    #     bpy.ops.preferences.addon_enable(module=addon_name)
+    #     print(f"Addon '{addon_name}' enabled successfully.")
+    # else:
+    #     print(f"Addon '{addon_name}' is already enabled.")
 
     # Set Render Engine
     bpy.context.scene.render.engine = 'FABEX_RENDER'
@@ -29,6 +52,7 @@ def setup_blender_scene(engrave_text, text_width_mm, text_height_mm, text_positi
 
     # Add text object
     bpy.ops.object.text_add(location=(0, 0, 0))
+
     text_obj = bpy.context.object
     text_obj.data.body = engrave_text
 
@@ -71,7 +95,7 @@ def setup_blender_scene(engrave_text, text_width_mm, text_height_mm, text_positi
 
     print("✅ COMPLETED! GCODE is generated")
 
-engrave_text = "Sample"
+engrave_text = "GSGSHSDHSDh"
 text_height_mm, text_width_mm = 13, 46
 text_position_mm = (10, -30, -0.5)
 layer_height_mm = 10

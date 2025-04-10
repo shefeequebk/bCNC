@@ -1,5 +1,12 @@
-import bpy
+
 import os
+
+# Redirect Blender's configuration, data, and scripts to your custom paths
+os.environ["BLENDER_USER_CONFIG"] = r""
+os.environ["BLENDER_USER_SCRIPTS"] = r""
+os.environ["BLENDER_USER_DATAFILES"] = r""
+
+import bpy
 import sys
 import warnings
 from scipy.spatial import ConvexHull
@@ -27,8 +34,9 @@ def setup_blender_scene(engrave_text, text_width_mm, text_height_mm, text_positi
     
     # Suppress print output
     original_stdout = sys.stdout
-    # sys.stdout = open(os.devnull, 'w')
-    # sys.stderr = open(os.devnull, 'w')
+    original_stderr = sys.stderr
+    sys.stdout = open(os.devnull, 'w')
+    sys.stderr = open(os.devnull, 'w')
     
     try:
         # # Enable Addon
@@ -79,7 +87,7 @@ def setup_blender_scene(engrave_text, text_width_mm, text_height_mm, text_positi
 
         bpy.ops.wm.save_as_mainfile(filepath=blend_file_path)
 
-        # print(f"✅ COMPLETED! Text is properly sized to {text_width_mm}mm x {text_height_mm}mm")
+        print(f"COMPLETED! Text is properly sized to {text_width_mm}mm x {text_height_mm}mm")
 
         bpy.context.scene.cam_operations[0].cut_type = 'ONLINE'
         bpy.context.scene.cam_operations[0].stepdown = layer_height_mm / 1000  # layer height
@@ -90,21 +98,25 @@ def setup_blender_scene(engrave_text, text_width_mm, text_height_mm, text_positi
 
         bpy.ops.object.calculate_cam_path()
 
-        bpy.ops.wm.save_as_mainfile(filepath=blend_file_path)
+
+        # bpy.ops.wm.save_as_mainfile(filepath=blend_file_path)
         
         gcode_file_path = os.path.join(save_dir, "Op_Text_1.tap")
+
+        print("COMPLETED! GCODE is generated", gcode_file_path)
+
         # Instead of closing, reset the scene
         bpy.ops.wm.read_factory_settings(use_empty=True)
 
-        # print("✅ COMPLETED! GCODE is generated", blend_file_path)
+        # print("COMPLETED! GCODE is generated", blend_file_path)
         
     finally:
         sys.stdout.close()
         sys.stderr.close()
         # Restore original print output
         sys.stdout = original_stdout
+        sys.stderr = original_stderr
         warnings.resetwarnings()
-    
 
     return gcode_file_path
 

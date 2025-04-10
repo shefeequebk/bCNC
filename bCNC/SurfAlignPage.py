@@ -643,9 +643,9 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         
         row += 1
         col = 0
-        Label(frame, text=_("Surf Align G-Code:")).grid(row=row, column=col, sticky=E)
+        Label(frame, text=_("Surface Align G-Code:")).grid(row=row, column=col, sticky=E)
         col += 1
-        surf_align_gcode_b = Button(frame, text=_("Surf Align G-Code"), command=lambda a=app: a.insertCommand("SURF_ALIGN", True))
+        surf_align_gcode_b = Button(frame, text=_("Surface Align G-Code"), command=lambda a=app: a.insertCommand("SURF_ALIGN", True))
         surf_align_gcode_b.grid(row=row, column=col, sticky=W)
         self.addWidget(surf_align_gcode_b)
 
@@ -688,8 +688,10 @@ class MultiPointProbe(CNCRibbon.PageFrame):
             messagebox.showwarning(_("Probe error"), _("No probe points found"))
             return
         print("Start Probing")
-        lines = self.app.gcode.probe.multi_point_scan(self.probe_points)
-        # self.app.run(lines)
+        mp_z_min = float(self.mp_z_min.get())
+        mp_z_max = float(self.mp_z_max.get())
+        lines = self.app.gcode.probe.multi_point_scan(self.probe_points, mp_z_min, mp_z_max)
+        self.app.run(lines)
         print("PROBE COMMAND:")
         print("\n".join(lines))
 

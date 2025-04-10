@@ -314,24 +314,25 @@ class Probe:
         lines.append(f"G0X{self.xmin:.4f}Y{self.ymin:.4f}")
         return lines
 
-    def multi_point_scan(self, probe_points):
+    def multi_point_scan(self, probe_points, mp_z_min, mp_z_max):
         self.clear()
         self.start = True
         self.makeMatrix()
         self.is_multi_point_scan = True
         lines = []
         self.no_of_points = len(probe_points)
-        lines.append(f"G0Z{CNC.vars['safe']:.4f}")
+        lines.append(f"G0Z{mp_z_max:.4f}")
         lines.append(f"G0X{self.xmin:.4f}Y{self.ymin:.4f}")
         for point in probe_points:
-            lines.append(f"G0Z{self.zmax:.4f}")
+            lines.append(f"G0Z{mp_z_max:.4f}")
             lines.append(f"G0X{point[0]:.4f}Y{point[1]:.4f}")
             lines.append("%wait")  # added for smoothie
             lines.append(
-                f"{CNC.vars['prbcmd']}Z{self.zmin:.4f}"
+                f"{CNC.vars['prbcmd']}Z{mp_z_min:.4f}"
+                f"F{CNC.vars['prbfeed']:g}"
             )
             lines.append("%wait")  # added for smoothie
-        lines.append(f"G0Z{self.zmax:.4f}")
+        lines.append(f"G0Z{mp_z_max:.4f}")
         lines.append(f"G0X{self.xmin:.4f}Y{self.ymin:.4f}")
         return lines
     
@@ -3852,15 +3853,12 @@ class GCode:
         return new
     def surf_align_gcode(self, items):
         print("Surf Align G-Code")
-        sample_points = [
-            [-3.861, 18.207, 0],
-            [4.7, -22.876, -1],
-            [-4.7, -3.686, 0],
-            [4.701, 7.0, -3],
-            [4.701, -11, 2]
-            ]
+        if self.probe.multi_probe_points is None or len(self.probe.multi_probe_points) < self.probe.no_of_points:
+            print("No Multi-Point Probe Points, or not enough points")
+            return
+
         degree = 1
-        poly_plane_coeffs= self.fit_polynomial_surface_numpy(sample_points, degree=degree)
+        poly_plane_coeffs= self.fit_polynomial_surface_numpy(self.probe.multi_probe_points, degree=degree)
         print("Poly Plane Coeffs: ", poly_plane_coeffs, "degree: ", degree)
         undoinfo = []
         operation = "surf_align"

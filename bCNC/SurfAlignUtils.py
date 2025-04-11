@@ -1,4 +1,3 @@
-
 import os
 
 # Redirect Blender's configuration, data, and scripts to your custom paths
@@ -15,7 +14,6 @@ import matplotlib.pyplot as plt
 import re
 import math
 
-
 # import fabex addon
 import fabex
 
@@ -25,19 +23,21 @@ if hasattr(fabex, "register"):
 else:
     print("No register() function found in addon.")
 
-def setup_blender_scene(engrave_text, text_width_mm, text_height_mm, text_position_mm, rotation_degrees, layer_height_mm, safe_height_mm, save_dir, feedrate_mm, spindle_rpm):
+
+def setup_blender_scene(engrave_text, text_width_mm, text_height_mm, text_position_mm, rotation_degrees,
+                        layer_height_mm, safe_height_mm, save_dir, feedrate_mm, spindle_rpm):
     blend_file_path = os.path.join(save_dir, "output.blend")
     # addon_name = "bl_ext.user_default.fabex"
-    
+
     # Suppress warnings
     warnings.filterwarnings("ignore")
-    
+
     # Suppress print output
     original_stdout = sys.stdout
     original_stderr = sys.stderr
     sys.stdout = open(os.devnull, 'w')
     sys.stderr = open(os.devnull, 'w')
-    
+
     try:
         # # Enable Addon
         # if addon_name not in bpy.context.preferences.addons:
@@ -55,6 +55,9 @@ def setup_blender_scene(engrave_text, text_width_mm, text_height_mm, text_positi
         # bpy.context.scene.unit_settings.system = 'METRIC'
         # bpy.context.scene.unit_settings.scale_length = 0.001
         bpy.context.scene.unit_settings.length_unit = 'MILLIMETERS'  # Set units to millimeters
+
+        bpy.context.scene.cam_machine.output_tool_change = False  # Disable tool change command
+        bpy.context.scene.cam_machine.eval_splitting = False  # Disable splitting g-code for large files
 
         # Remove all objects
         bpy.ops.object.select_all(action='SELECT')
@@ -81,9 +84,7 @@ def setup_blender_scene(engrave_text, text_width_mm, text_height_mm, text_positi
         text_obj.location = text_pos_meters
         text_obj.rotation_euler = (0, 0, math.radians(rotation_degrees))  # Convert to radians
 
-
         bpy.ops.scene.cam_operation_add()
-        
 
         bpy.ops.wm.save_as_mainfile(filepath=blend_file_path)
 
@@ -93,14 +94,13 @@ def setup_blender_scene(engrave_text, text_width_mm, text_height_mm, text_positi
         bpy.context.scene.cam_operations[0].stepdown = layer_height_mm / 1000  # layer height
         bpy.context.scene.cam_operations[0].movement.free_height = safe_height_mm / 1000  # Safe height
         bpy.context.scene.cam_operations[0].outlines_count = 2
-        bpy.context.scene.cam_operations[0].feedrate = feedrate_mm/1000
+        bpy.context.scene.cam_operations[0].feedrate = feedrate_mm / 1000
         bpy.context.scene.cam_operations[0].spindle_rpm = spindle_rpm
 
         bpy.ops.object.calculate_cam_path()
 
-
         # bpy.ops.wm.save_as_mainfile(filepath=blend_file_path)
-        
+
         gcode_file_path = os.path.join(save_dir, "Op_Text_1.tap")
 
         print("COMPLETED! GCODE is generated", gcode_file_path)
@@ -109,7 +109,7 @@ def setup_blender_scene(engrave_text, text_width_mm, text_height_mm, text_positi
         bpy.ops.wm.read_factory_settings(use_empty=True)
 
         # print("COMPLETED! GCODE is generated", blend_file_path)
-        
+
     finally:
         sys.stdout.close()
         sys.stderr.close()
@@ -119,10 +119,6 @@ def setup_blender_scene(engrave_text, text_width_mm, text_height_mm, text_positi
         warnings.resetwarnings()
 
     return gcode_file_path
-
-
-
-
 
 
 import numpy as np
@@ -183,6 +179,7 @@ def plot_surface(points, X_grid, Y_grid, Z_grid):
     plt.legend()
     plt.show()
 
+
 def calculate_z_from_poly(X, Y, coeffs):
     """
     Calculate Z values from X and Y using the polynomial coefficients.
@@ -200,6 +197,3 @@ def calculate_z_from_poly(X, Y, coeffs):
             Z += coeffs[index] * (X ** i) * (Y ** j)
             index += 1
     return Z
-
-
-

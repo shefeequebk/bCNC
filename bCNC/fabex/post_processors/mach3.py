@@ -14,7 +14,7 @@ class Creator(iso.Creator):
         self.write(("(" + comment + ")" + "\n"))
 
     def tool_change(self, id):
-        self.write("G43H%i" % id + "\n")
+        self.write("" % id + "\n")
         self.write((self.TOOL() % id) + "\n")
         self.t = id
 

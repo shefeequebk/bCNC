@@ -335,8 +335,7 @@ class Probe:
         lines.append(f"G0Z{mp_z_max:.4f}")
         lines.append(f"G0X{self.xmin:.4f}Y{self.ymin:.4f}")
         return lines
-    
-    
+
     # ----------------------------------------------------------------------
     # Add a probed point to the list and the 3D matrix
     # ----------------------------------------------------------------------
@@ -417,10 +416,10 @@ class Probe:
         b1 = 1.0 - b
 
         return (
-            a1 * b1 * self.matrix[j][i]
-            + a1 * b * self.matrix[j + 1][i]
-            + a * b1 * self.matrix[j][i + 1]
-            + a * b * self.matrix[j + 1][i + 1]
+                a1 * b1 * self.matrix[j][i]
+                + a1 * b * self.matrix[j + 1][i]
+                + a * b1 * self.matrix[j][i + 1]
+                + a * b * self.matrix[j + 1][i + 1]
         )
 
     # ----------------------------------------------------------------------
@@ -452,8 +451,8 @@ class Probe:
         j = int(math.floor((y1 - self.ymin) / self._ystep))
         if dx > 1e-10:
             tx = (
-                float(i + 1) * self._xstep + self.xmin - x1
-            ) / dx  # distance to next cell
+                         float(i + 1) * self._xstep + self.xmin - x1
+                 ) / dx  # distance to next cell
             tdx = self._xstep / dx
         elif dx < -1e-10:
             # distance to next cell
@@ -465,8 +464,8 @@ class Probe:
 
         if dy > 1e-10:
             ty = (
-                float(j + 1) * self._ystep + self.ymin - y1
-            ) / dy  # distance to next cell
+                         float(j + 1) * self._ystep + self.ymin - y1
+                 ) / dy  # distance to next cell
             tdy = self._ystep / dy
         elif dy < -1e-10:
             # distance to next cell
@@ -496,21 +495,18 @@ class Probe:
 
         segments.append((x2, y2, z2 + self.interpolate(x2, y2)))
         return segments
-    
-    
+
     def calculate_z_from_poly(self, X, Y, coeffs, degree):
         Z = 0.0
         index = 0
-        print("Degree:", degree, "Coeff:", coeffs, "X:", X, "Y:", Y)
+        # print("Degree:", degree, "Coeff:", coeffs, "X:", X, "Y:", Y)
         for i in range(degree + 1):
             for j in range(degree + 1 - i):
-                print("ADDING Z VLAUE", Z, "Degree:", degree, "Index:", index, "Coeff:", coeffs, "X:", X, "Y:", Y)
                 Z += coeffs[index] * (X ** i) * (Y ** j)
                 index += 1
         return Z  # Add 1 if you want a vertical offset
-    
+
     def splitLine_surf_align(self, x1, y1, z1, x2, y2, z2, poly_plane_coeffs, poly_plane_degree, step_size):
-        print("Split Line Surf Align", x1, y1, z1, x2, y2, z2, poly_plane_coeffs, poly_plane_degree, step_size)
         dx = x2 - x1
         dy = y2 - y1
         dz = z2 - z1
@@ -523,9 +519,9 @@ class Probe:
             dz = 0.0
 
         if dx == 0.0 and dy == 0.0:
-            print("x2: ", x2, "y2: ", y2, "poly_plane_coeffs: ", poly_plane_coeffs.tolist())
+            # print("x2: ", x2, "y2: ", y2, "poly_plane_coeffs: ", poly_plane_coeffs.tolist())
             z2 = self.calculate_z_from_poly(x2, y2, poly_plane_coeffs.tolist(), poly_plane_degree)
-            print("z2: ", z2)
+            # print("z2: ", z2)
             return [(x2, y2, z2)]
             # return [(x2, y2, z2+1)]
 
@@ -534,18 +530,18 @@ class Probe:
         dx /= rxy  # direction cosines along XY plane
         dy /= rxy
         dz /= rxy  # add correction for the slope in Z, versus the travel in XY
-        print("self.xmin: ", self.xmin, "self.ymin: ", self.ymin)
+        # print("self.xmin: ", self.xmin, "self.ymin: ", self.ymin)
         i = int(math.floor((x1 - self.xmin) / step_size))
         j = int(math.floor((y1 - self.ymin) / step_size))
-        print("i: ", i, "j: ", j)
+        # print("i: ", i, "j: ", j)
         if dx > 1e-10:
             tx = (
-                float(i + 1) * step_size + self.xmin - x1
-            ) / dx  # distance to next cell
+                         float(i + 1) * step_size + self.xmin - x1
+                 ) / dx  # distance to next cell
             tdx = step_size / dx
         elif dx < -1e-10:
             # distance to next cell
-            tx = (float(i) * step_size + self.xmin - x1) / dx   
+            tx = (float(i) * step_size + self.xmin - x1) / dx
             tdx = -step_size / dx
         else:
             tx = 1e10
@@ -553,8 +549,8 @@ class Probe:
 
         if dy > 1e-10:
             ty = (
-                float(j + 1) * step_size + self.ymin - y1
-            ) / dy  # distance to next cell
+                         float(j + 1) * step_size + self.ymin - y1
+                 ) / dy  # distance to next cell
             tdy = step_size / dy
         elif dy < -1e-10:
             # distance to next cell
@@ -563,7 +559,7 @@ class Probe:
         else:
             ty = 1e10
             tdy = 0.0
-        print("tx: ", tx, "ty: ", ty)
+        # print("tx: ", tx, "ty: ", ty)
         segments = []
         rxy *= 0.999999999  # just reduce a bit to avoid precision errors
         while tx < rxy or ty < rxy:
@@ -580,16 +576,14 @@ class Probe:
             x = x1 + t * dx
             y = y1 + t * dy
             z = z1 + t * dz
-            print("segments 111: ", x, y, poly_plane_coeffs.tolist())
             z += self.calculate_z_from_poly(x, y, poly_plane_coeffs.tolist(), poly_plane_degree)
             # segments.append((x, y, self.calculate_z_from_poly(x, y, poly_plane_coeffs)))
             segments.append((x, y, z))
-        print("segments 222: ", x2, y2, poly_plane_coeffs.tolist())
-        z2 += self.calculate_z_from_poly(x2, y2, poly_plane_coeffs.tolist(), poly_plane_degree)  
+        z2 += self.calculate_z_from_poly(x2, y2, poly_plane_coeffs.tolist(), poly_plane_degree)
         # segments.append((x2, y2, self.calculate_z_from_poly(x2, y2, poly_plane_coeffs)))
         segments.append((x2, y2, z2))
         return segments
-    
+
     def make_line_segments(self, x1, y1, z1, x2, y2, z2, step_size):
         dx = x2 - x1
         dy = y2 - y1
@@ -615,8 +609,8 @@ class Probe:
         j = int(math.floor((y1 - self.ymin) / step_size))
         if dx > 1e-10:
             tx = (
-                float(i + 1) * step_size + self.xmin - x1
-            ) / dx  # distance to next cell
+                         float(i + 1) * step_size + self.xmin - x1
+                 ) / dx  # distance to next cell
             tdx = step_size / dx
         elif dx < -1e-10:
             # distance to next cell
@@ -628,8 +622,8 @@ class Probe:
 
         if dy > 1e-10:
             ty = (
-                float(j + 1) * step_size + self.ymin - y1
-            ) / dy  # distance to next cell
+                         float(j + 1) * step_size + self.ymin - y1
+                 ) / dy  # distance to next cell
             tdy = step_size / dy
         elif dy < -1e-10:
             # distance to next cell
@@ -659,7 +653,8 @@ class Probe:
 
         segments.append((x2, y2, z2))
         return segments
-        
+
+
 # =============================================================================
 # contains a list of machine points vs position in the gcode
 # calculates the transformation matrix (rotation + translation) needed
@@ -802,7 +797,7 @@ class Orient:
         for i, (xm, ym, x, y) in enumerate(self.markers):
             dx = c * x - s * y + self.xo - xm
             dy = s * x + c * y + self.yo - ym
-            err = sqrt(dx**2 + dy**2)
+            err = sqrt(dx ** 2 + dy ** 2)
             self.errors.append(err)
 
             minerr = min(minerr, err)
@@ -963,6 +958,7 @@ class CNC:
 
     toolWaitAfterProbe = True  # wait at tool change position after probing
     appendFeed = False  # append feed on every G1/G2/G3 commands to be used
+
     # for feed override testing
     # FIXME will not be needed after Grbl v1.0
 
@@ -1214,18 +1210,18 @@ class CNC:
     @staticmethod
     def isMarginValid():
         return (
-            CNC.vars["xmin"] <= CNC.vars["xmax"]
-            and CNC.vars["ymin"] <= CNC.vars["ymax"]
-            and CNC.vars["zmin"] <= CNC.vars["zmax"]
+                CNC.vars["xmin"] <= CNC.vars["xmax"]
+                and CNC.vars["ymin"] <= CNC.vars["ymax"]
+                and CNC.vars["zmin"] <= CNC.vars["zmax"]
         )
 
     # ----------------------------------------------------------------------
     @staticmethod
     def isAllMarginValid():
         return (
-            CNC.vars["axmin"] <= CNC.vars["axmax"]
-            and CNC.vars["aymin"] <= CNC.vars["aymax"]
-            and CNC.vars["azmin"] <= CNC.vars["azmax"]
+                CNC.vars["axmin"] <= CNC.vars["axmax"]
+                and CNC.vars["aymin"] <= CNC.vars["aymax"]
+                and CNC.vars["azmin"] <= CNC.vars["azmax"]
         )
 
     # ----------------------------------------------------------------------
@@ -1722,9 +1718,9 @@ class CNC:
             ABy = yv - y
             Cx = 0.5 * (x + xv)
             Cy = 0.5 * (y + yv)
-            AB = math.sqrt(ABx**2 + ABy**2)
+            AB = math.sqrt(ABx ** 2 + ABy ** 2)
             try:
-                OC = math.sqrt(self.rval**2 - AB**2 / 4.0)
+                OC = math.sqrt(self.rval ** 2 - AB ** 2 / 4.0)
             except Exception:
                 OC = 0.0
             if self.gcode == 2:
@@ -1739,7 +1735,7 @@ class CNC:
             xc = self.x + self.ival
             yc = self.y + self.jval
             zc = self.z + self.kval
-            self.rval = math.sqrt(self.ival**2 + self.jval**2 + self.kval**2)
+            self.rval = math.sqrt(self.ival ** 2 + self.jval ** 2 + self.kval ** 2)
 
             if self.plane == XY:
                 return xc, yc
@@ -1757,9 +1753,9 @@ class CNC:
         # Execute g-code
         if self.gcode in (0, 1):  # fast move or line
             if (
-                self.xval - self.x != 0.0
-                or self.yval - self.y != 0.0
-                or self.zval - self.z != 0.0
+                    self.xval - self.x != 0.0
+                    or self.yval - self.y != 0.0
+                    or self.zval - self.z != 0.0
             ):
                 xyz.append((self.x, self.y, self.z))
                 xyz.append((self.xval, self.yval, self.zval))
@@ -2062,8 +2058,8 @@ class CNC:
             if CNC.vars["fastprbfeed"]:
                 prb_reverse = {"2": "4", "3": "5", "4": "2", "5": "3"}
                 CNC.vars["prbcmdreverse"] = (
-                    CNC.vars["prbcmd"][:-1]
-                    + prb_reverse[CNC.vars["prbcmd"][-1]]
+                        CNC.vars["prbcmd"][:-1]
+                        + prb_reverse[CNC.vars["prbcmd"][-1]]
                 )
                 currentFeedrate = CNC.vars["fastprbfeed"]
                 while currentFeedrate > CNC.vars["prbfeed"]:
@@ -2349,9 +2345,9 @@ class Block(list):
     # ----------------------------------------------------------------------
     def header(self):
         e = (
-            self.expand
-            and Unicode.BLACK_DOWN_POINTING_TRIANGLE
-            or Unicode.BLACK_RIGHT_POINTING_TRIANGLE
+                self.expand
+                and Unicode.BLACK_DOWN_POINTING_TRIANGLE
+                or Unicode.BLACK_RIGHT_POINTING_TRIANGLE
         )
         v = self.enable and Unicode.BALLOT_BOX_WITH_X or Unicode.BALLOT_BOX
         try:
@@ -2503,6 +2499,7 @@ class GCode:
         self.orient = Orient()
         self.vars = {}  # local variables
         self.surf_align_probe_points = []
+        self.z_probe_to_tool_offset = 0
         self.init()
 
     # ----------------------------------------------------------------------
@@ -2981,8 +2978,8 @@ class GCode:
                     midx = self.cnc.x
                     midy = self.cnc.y
                     if (
-                        self.cnc.y == self.cnc.yval
-                        and self.cnc.x == self.cnc.xval
+                            self.cnc.y == self.cnc.yval
+                            and self.cnc.x == self.cnc.xval
                     ):  # is full circle?
                         midx = self.cnc.x + (xc - self.cnc.x) * 2
                         midy = self.cnc.y + (yc - self.cnc.y) * 2
@@ -3111,19 +3108,19 @@ class GCode:
     # @param zstart I       starting depth
     # ----------------------------------------------------------------------
     def fromPath(
-        self,
-        path,
-        block=None,
-        z=None,
-        retract=True,
-        entry=False,
-        exit_=True,
-        zstart=None,
-        ramp=None,
-        comments=True,
-        exitpoint=None,
-        truncate=None,
-        dwell=None
+            self,
+            path,
+            block=None,
+            z=None,
+            retract=True,
+            entry=False,
+            exit_=True,
+            zstart=None,
+            ramp=None,
+            comments=True,
+            exitpoint=None,
+            truncate=None,
+            dwell=None
     ):
         # Recursion for multiple paths
         if not isinstance(path, Path):
@@ -3296,7 +3293,7 @@ class GCode:
                     # if we need to enter the toolpath after done
                     # clearing the tab
                     if (ztab == float("-inf") or ztab < ztabprev) and (
-                        zh < ztabprev or zhprev < ztabprev
+                            zh < ztabprev or zhprev < ztabprev
                     ):
                         if comments:
                             block.append(
@@ -3304,7 +3301,7 @@ class GCode:
                         block.append(CNC.zenter(max(zhprev, ztab), 7))
                         setfeed = True
                     elif (
-                        zh < ztab or zhprev < ztab
+                            zh < ztab or zhprev < ztab
                     ):  # if we need to go higher in order to clear the tab
                         if comments:
                             block.append("(tab up " + str(max(zh, ztab)) + ")")
@@ -3786,18 +3783,22 @@ class GCode:
                 terms.append((X ** i) * (Y ** j))
         return np.vstack(terms).T
 
-
     def fit_polynomial_surface_numpy(self, points, degree=2):
         points = np.array(points)
+        if points.ndim != 2 or points.shape[1] < 3:
+            print("❌ Error: 'multi_probe_points' must be a list of 3D points (X, Y, Z)")
+            return None
         X, Y, Z = points[:, 0], points[:, 1], points[:, 2]
         A = self.build_vandermonde(X, Y, degree)
         coeffs, *_ = np.linalg.lstsq(A, Z, rcond=None)  # least squares solution
         return coeffs
-    
 
-    
     def surf_align_block(self, block, poly_plane_coeffs, poly_plane_degree):
+        z_probe_offset = self.z_probe_to_tool_offset
         new = []
+
+        all_x, all_y, all_z = [], [], []
+
         # is_multi_point_probe = not self.probe.multi_point_probe.is_empty()
         is_multi_point_probe = True
         for line in block:
@@ -3832,9 +3833,9 @@ class GCode:
                         g = 1
                     for x2, y2, z2 in xyz[1:]:
                         for x, y, z in self.probe.splitLine_surf_align(x1, y1, z1, x2,
-                                                            y2, z2, poly_plane_coeffs, poly_plane_degree, step_size=1):
-                            # print("SPLIT LINE SURF ALIGN COMPLETED")
-                            # print("CNC UNIT: ", self.cnc.unit)
+                                                                       y2, z2, poly_plane_coeffs, poly_plane_degree,
+                                                                       step_size=1):
+                            z += z_probe_offset
                             new.append(
                                 "".join([
                                     f"G{int(g)}",
@@ -3844,33 +3845,77 @@ class GCode:
                                     extra,
                                 ])
                             )
+                            all_x.append(x)
+                            all_y.append(y)
+                            all_z.append(z)
                             extra = ""
                         x1, y1, z1 = x2, y2, z2
                 self.cnc.motionEnd()
             else:
                 self.cnc.motionEnd()
                 new.append(line)
-        return new
+
+        # Calculate bounds
+        bounds = {
+            "x_min": min(all_x) if all_x else None,
+            "x_max": max(all_x) if all_x else None,
+            "y_min": min(all_y) if all_y else None,
+            "y_max": max(all_y) if all_y else None,
+            "z_min": min(all_z) if all_z else None,
+            "z_max": max(all_z) if all_z else None,
+        }
+
+        return new, bounds
+
     def surf_align_gcode(self, items):
         print("Surf Align G-Code")
+
+        # self.probe.multi_probe_points = [[-3.861, 18.207, 0], [4.7, -22.876, -1], [-4.7, -3.686, 0],
+        #                                  [4.701, 7.0, -3], [4.701, -11, 2]]  # Remove this, test probe points
+
         if self.probe.multi_probe_points is None or len(self.probe.multi_probe_points) < self.probe.no_of_points:
             print("No Multi-Point Probe Points, or not enough points")
             return
 
         degree = 1
-        poly_plane_coeffs= self.fit_polynomial_surface_numpy(self.probe.multi_probe_points, degree=degree)
+        poly_plane_coeffs = self.fit_polynomial_surface_numpy(self.probe.multi_probe_points, degree=degree)
+        if poly_plane_coeffs is None:
+            print("❌ Polynomial fitting failed. Aborting surface align.")
+            return
         print("Poly Plane Coeffs: ", poly_plane_coeffs, "degree: ", degree)
         undoinfo = []
         operation = "surf_align"
+
+        # Initialize total min/max values
+        total_bounds = {
+            "x_min": float("inf"), "x_max": float("-inf"),
+            "y_min": float("inf"), "y_max": float("-inf"),
+            "z_min": float("inf"), "z_max": float("-inf")
+        }
+
         for bid in items:
             block = self.blocks[bid]
             if block.name() in ("Header", "Footer"):
                 continue
-            lines = self.surf_align_block(block, poly_plane_coeffs, poly_plane_degree=degree)
+            lines, bounds = self.surf_align_block(block, poly_plane_coeffs, poly_plane_degree=degree)
             undoinfo.append(self.addBlockOperationUndo(bid, operation))
             undoinfo.append(self.setBlockLinesUndo(bid, lines))
+
+            # Update total bounds
+            for axis in ["x", "y", "z"]:
+                if bounds[f"{axis}_min"] is not None:
+                    total_bounds[f"{axis}_min"] = min(total_bounds[f"{axis}_min"], bounds[f"{axis}_min"])
+                    total_bounds[f"{axis}_max"] = max(total_bounds[f"{axis}_max"], bounds[f"{axis}_max"])
+
         if undoinfo:
             self.addUndo(undoinfo)
+
+        # If no data was collected, reset inf values to None
+        for key in total_bounds:
+            if math.isinf(total_bounds[key]):
+                total_bounds[key] = None
+
+        print("✅ Total Bounds (min/max):", total_bounds)
 
     # ----------------------------------------------------------------------
     # Return string representation of whole file
@@ -3955,22 +4000,22 @@ class GCode:
     # Retract height=safe height
     # ----------------------------------------------------------------------
     def drill(
-        self,
-        items,
-        depth=None,
-        peck=None,
-        dwell=None,
-        distance=None,
-        number=0,
-        center=True,
+            self,
+            items,
+            depth=None,
+            peck=None,
+            dwell=None,
+            distance=None,
+            number=0,
+            center=True,
     ):
         # find the penetration points and drill
         # skip all g1 movements on the horizontal plane
         if depth is None:
             depth = self.cnc["surface"] - self.cnc["thickness"]
         if (
-            depth < self.cnc["surface"] - self.cnc["thickness"]
-            or depth > self.cnc["surface"]
+                depth < self.cnc["surface"] - self.cnc["thickness"]
+                or depth > self.cnc["surface"]
         ):
             return (
                 f"ERROR: Drill depth {depth:g} outside stock surface: "
@@ -4084,19 +4129,19 @@ class GCode:
     # @param stepz  I   stepping in z
     # ----------------------------------------------------------------------
     def cutPath(
-        self,
-        newblock,
-        block,
-        path,
-        z,
-        depth,
-        stepz,
-        helix=False,
-        helixBottom=True,
-        ramp=0,
-        islandPaths=[],
-        exitpoint=None,
-        springPass=False,
+            self,
+            newblock,
+            block,
+            path,
+            z,
+            depth,
+            stepz,
+            helix=False,
+            helixBottom=True,
+            ramp=0,
+            islandPaths=[],
+            exitpoint=None,
+            springPass=False,
     ):
         closed = path.isClosed()
         zigzag = True  # FIXME: Add UI to set this?
@@ -4266,23 +4311,23 @@ class GCode:
     # until the maximum height
     # ----------------------------------------------------------------------
     def cut(
-        self,
-        items,
-        depth=None,
-        stepz=None,
-        surface=None,
-        feed=None,
-        feedz=None,
-        cutFromTop=False,
-        helix=False,
-        helixBottom=True,
-        ramp=0,
-        islandsLeave=False,
-        islandsCut=False,
-        islandsSelectedOnly=True,
-        exitpoint=None,
-        springPass=False,
-        islandsCompensate=False,
+            self,
+            items,
+            depth=None,
+            stepz=None,
+            surface=None,
+            feed=None,
+            feedz=None,
+            cutFromTop=False,
+            helix=False,
+            helixBottom=True,
+            ramp=0,
+            islandsLeave=False,
+            islandsCut=False,
+            islandsSelectedOnly=True,
+            exitpoint=None,
+            springPass=False,
+            islandsCompensate=False,
     ):
         if surface is None:
             surface = self.cnc["surface"]
@@ -4304,8 +4349,8 @@ class GCode:
                 "Please change stock surface in Tools->Stock or cut depth."
             )
         if (
-            depth < self.cnc["surface"] - self.cnc["thickness"]
-            or depth > self.cnc["surface"]
+                depth < self.cnc["surface"] - self.cnc["thickness"]
+                or depth > self.cnc["surface"]
         ):
             return (
                 f"ERROR: Cut depth {depth:g} outside stock surface: "
@@ -4725,11 +4770,11 @@ class GCode:
             msg = msg + self.pocket(
                 sorted(newblocks), CNC.vars["diameter"], CNC.vars["stepover"] / 100, name, True, True
             )
-            withpocketblocks=sorted(newblocks).copy()
-            for i in range(0,len(withpocketblocks)):
-                withpocketblocks[i]+=i
-                withpocketblocks.append(withpocketblocks[i]+1)
-            newblocks = sorted(withpocketblocks,reverse=True)
+            withpocketblocks = sorted(newblocks).copy()
+            for i in range(0, len(withpocketblocks)):
+                withpocketblocks[i] += i
+                withpocketblocks.append(withpocketblocks[i] + 1)
+            newblocks = sorted(withpocketblocks, reverse=True)
         blocks.extend(newblocks)
         return msg
 
@@ -4766,8 +4811,8 @@ class GCode:
         opath.removeZeroLength(abs(offset) / 100.0)
         opath = opath.split2contours()
 
-#        if not opath:
-#            return None
+        #        if not opath:
+        #            return None
         if opath:
             for pout in opath:
                 pin = self._pocket(pout, diameter, stepover, depth + 1)
@@ -4853,7 +4898,7 @@ class GCode:
                 before = len(newblocks)
                 if updown:
                     undoinfo.extend(self.importPath(bid, newpath,
-                        newblocks, True, False))
+                                                    newblocks, True, False))
                 else:
                     undoinfo.extend(
                         self.importPath(bid + 1, newpath, newblocks, True, False)
@@ -4876,19 +4921,19 @@ class GCode:
     # return new blocks inside the blocks list
     # ----------------------------------------------------------------------
     def trochprofile_cnc(
-        self,
-        blocks,
-        offset,
-        overcut=False,
-        adaptative=True,
-        adaptedRadius=0.0,
-        cutDiam=0.0,
-        tooldiameter=0.0,
-        targetDepth=0.0,
-        depthIncrement=0.0,
-        tabsnumber=0.0,
-        tabsWidth=0.0,
-        tabsHeight=0.0,
+            self,
+            blocks,
+            offset,
+            overcut=False,
+            adaptative=True,
+            adaptedRadius=0.0,
+            cutDiam=0.0,
+            tooldiameter=0.0,
+            targetDepth=0.0,
+            depthIncrement=0.0,
+            tabsnumber=0.0,
+            tabsWidth=0.0,
+            tabsHeight=0.0,
     ):
         undoinfo = []
         msg = ""
@@ -4979,15 +5024,15 @@ class GCode:
 
     # ----------------------------------------------------------------------
     def adaptative_clearence(
-        self,
-        blocks,
-        offset,
-        overcut=False,
-        adaptative=True,
-        adaptedRadius=0.0,
-        cutDiam=0.0,
-        tooldiameter=0.0,
-        name=None,
+            self,
+            blocks,
+            offset,
+            overcut=False,
+            adaptative=True,
+            adaptedRadius=0.0,
+            cutDiam=0.0,
+            tooldiameter=0.0,
+            name=None,
     ):
         undoinfo = []
         msg = ""
@@ -5481,14 +5526,14 @@ class GCode:
                         extra = ""
                         for c in cmds:
                             if c[0].upper() not in (
-                                "G",
-                                "X",
-                                "Y",
-                                "Z",
-                                "I",
-                                "J",
-                                "K",
-                                "R",
+                                    "G",
+                                    "X",
+                                    "Y",
+                                    "Z",
+                                    "I",
+                                    "J",
+                                    "K",
+                                    "R",
                             ):
                                 extra += c
                         x1, y1, z1 = xyz[0]
@@ -5517,12 +5562,12 @@ class GCode:
                     # FIXME expansion policy here variable needed
                     # Canned cycles
                     if CNC.drillPolicy == 1 and self.cnc.gcode in (
-                        81,
-                        82,
-                        83,
-                        85,
-                        86,
-                        89,
+                            81,
+                            82,
+                            83,
+                            85,
+                            86,
+                            89,
                     ):
                         expand = self.cnc.macroGroupG8X()
                     # Tool change
@@ -5563,7 +5608,7 @@ class GCode:
                 add("".join(newcmd), (i, j))
 
         return paths
-    
+
     def plot_cutting_points(self, x_coords, y_coords, z_coords):
         # Plotting the coordinates
         fig = plt.figure()
@@ -5576,10 +5621,11 @@ class GCode:
 
         # Mark each coordinate with its (x, y, z) value
         for i in range(len(x_coords)):
-            ax.text(x_coords[i], y_coords[i], z_coords[i], f'({x_coords[i]:.2f}, {y_coords[i]:.2f}, {z_coords[i]:.2f})', size=8, zorder=1)
+            ax.text(x_coords[i], y_coords[i], z_coords[i], f'({x_coords[i]:.2f}, {y_coords[i]:.2f}, {z_coords[i]:.2f})',
+                    size=8, zorder=1)
 
         plt.show()
-    
+
     def make_cutting_points(self):
 
         x_coords = []
@@ -5611,11 +5657,11 @@ class GCode:
                             x_coords.append(x)
                             y_coords.append(y)
                             z_coords.append(z)
-                        
+
                 self.cnc.motionEnd()
 
         # self.plot_cutting_points(x_coords, y_coords, z_coords)
-        
+
         return x_coords, y_coords, z_coords
 
     def min_max_distance_k_centers_by_points(self, points, k):
@@ -5647,7 +5693,6 @@ class GCode:
 
         return points[selected_centers]
 
-
     def find_optimal_centers_by_rectangle(self, rectangle, candidate_centers, k):
         """
         Selects k centers from candidate centers that minimize the max distance required
@@ -5678,11 +5723,9 @@ class GCode:
 
         return candidate_centers[selected_centers]
 
-
-
     def plot_results_by_points(self, points, best_centers):
         fig, ax = plt.subplots()
-        ax.scatter(points[:, 0], points[:, 1], color='blue',alpha=0.5, s=3, label="Points")
+        ax.scatter(points[:, 0], points[:, 1], color='blue', alpha=0.5, s=3, label="Points")
         ax.scatter(best_centers[:, 0], best_centers[:, 1], color='red', marker='x', s=15, label="Selected Centers")
         max_radius = max(np.min(distance_matrix(best_centers, points), axis=0))
         for center in best_centers:
@@ -5699,8 +5742,10 @@ class GCode:
         rect = plt.Rectangle((rectangle[0], rectangle[1]), rectangle[2] - rectangle[0], rectangle[3] - rectangle[1],
                              linewidth=2, edgecolor='black', facecolor='none', label="Target Rectangle")
         ax.add_patch(rect)
-        ax.scatter(candidate_centers[:, 0], candidate_centers[:, 1], color='blue', alpha=0.5, s=3, label="Candidate Points")
-        ax.scatter(optimal_centers[:, 0], optimal_centers[:, 1], color='red', marker='x', s=15, label="Selected Centers")
+        ax.scatter(candidate_centers[:, 0], candidate_centers[:, 1], color='blue', alpha=0.5, s=3,
+                   label="Candidate Points")
+        ax.scatter(optimal_centers[:, 0], optimal_centers[:, 1], color='red', marker='x', s=15,
+                   label="Selected Centers")
         max_radius = max(np.min(distance_matrix(optimal_centers, candidate_centers), axis=0))
         for center in optimal_centers:
             circle = plt.Circle(center, max_radius, color='green', fill=False, linestyle='dashed')
@@ -5720,31 +5765,20 @@ class GCode:
         x_min, x_max = np.min(x_coords), np.max(x_coords)
         y_min, y_max = np.min(y_coords), np.max(y_coords)
         points = np.array([(x, y) for x, y in zip(x_coords, y_coords)])
-        
+
         if method == "EvenCoverage":
             optimal_centers = self.min_max_distance_k_centers_by_points(points, k)
             self.surf_align_probe_points = optimal_centers
             # Call the new plotting function
             self.plot_results_by_points(points, optimal_centers)
-        
+
         elif method == "AreaCoverage":
             # Find the optimal centers by rectangle
             rectangle = (x_min, y_min, x_max, y_max)
-            
+
             optimal_centers = self.find_optimal_centers_by_rectangle(rectangle, points, k)
             self.surf_align_probe_points = optimal_centers
             # Call the new plotting function
             self.plot_rectangle_and_centers(rectangle, points, optimal_centers)
-            
+
         return optimal_centers
-
-
-
-
-
-
-
-
-
-
-

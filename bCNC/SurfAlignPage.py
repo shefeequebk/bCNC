@@ -541,24 +541,20 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
 
 
     # # -----------------------------------------------------------------------
-    # def saveConfig(self):
-    #     Utils.setFloat("Probe",
-    #                    "fastfeed", GenGcodeFrame.fastProbeFeed.get())
-    #     Utils.setFloat("Probe", "feed", GenGcodeFrame.probeFeed.get())
-    #     Utils.setFloat("Probe", "tlo", GenGcodeFrame.tlo.get())
-    #     Utils.setFloat("Probe", "cmd",
-    #                    GenGcodeFrame.probeCmd.get().split()[0])
+    def saveConfig(self):
+        Utils.setStr("SurfAlign", "engraveText", self.engraveText.get())
+        Utils.setFloat("SurfAlign", "height", self.height.get())
+        Utils.setFloat("SurfAlign", "width", self.width.get())
+        Utils.setFloat("SurfAlign", "posX", self.posX.get())
+        Utils.setFloat("SurfAlign", "posY", self.posY.get())
+        Utils.setFloat("SurfAlign", "rotation", self.rotation.get())
+        Utils.setFloat("SurfAlign", "feedrate", self.feedrate.get())
+        Utils.setFloat("SurfAlign", "spindleRPM", self.spindleRPM.get())
+        Utils.setFloat("SurfAlign", "engraveDepth", self.engraveDepth.get())
+        Utils.setFloat("SurfAlign", "layerHeight", self.layerHeight.get())
+        Utils.setFloat("SurfAlign", "safeHeight", self.safeHeight.get())
 
-    # # -----------------------------------------------------------------------
-    # def loadConfig(self):
-    #     GenGcodeFrame.engraveText.set(Utils.getFloat("Probe", "engraveText"))
-    #     GenGcodeFrame.probeFeed.set(Utils.getFloat("Probe", "feed"))
-    #     GenGcodeFrame.tlo.set(Utils.getFloat("Probe", "tlo"))
-    #     cmd = Utils.getStr("Probe", "cmd")
-    #     for p in PROBE_CMD:
-    #         if p.split()[0] == cmd:
-    #             GenGcodeFrame.probeCmd.set(p)
-    #             break
+
 
 
 class MultiPointProbe(CNCRibbon.PageFrame):
@@ -641,11 +637,25 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         probe_generate_b.grid(row=row, column=col, sticky=W)
         self.addWidget(probe_generate_b)
         
+        row+=1
+        col = 0
+        Label(frame, text=_("Z Offset (Probe → Tool):")).grid(row=row, column=col, sticky=E)
+        col += 1
+        self.z_probe_to_tool_offset = tkExtra.FloatEntry(
+            frame, background=tkExtra.GLOBAL_CONTROL_BACKGROUND
+        )
+        self.z_probe_to_tool_offset.grid(row=row, column=col, sticky=EW)
+        tkExtra.Balloon.set(
+            self.z_probe_to_tool_offset, _("Z offset (mm) between probe and tool, will be negative if tool head is below probe point")
+        )
+        self.addWidget(self.z_probe_to_tool_offset)
+        
+        
         row += 1
         col = 0
         Label(frame, text=_("Surface Align G-Code:")).grid(row=row, column=col, sticky=E)
         col += 1
-        surf_align_gcode_b = Button(frame, text=_("Surface Align G-Code"), command=lambda a=app: a.insertCommand("SURF_ALIGN", True))
+        surf_align_gcode_b = Button(frame, text=_("Surface Align G-Code"), command=self.surface_align_gcode)
         surf_align_gcode_b.grid(row=row, column=col, sticky=W)
         self.addWidget(surf_align_gcode_b)
 
@@ -656,7 +666,20 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         self.mp_z_min.set(Utils.getFloat("SurfAlign", "mp_z_min"))
         self.mp_z_max.set(Utils.getFloat("SurfAlign", "mp_z_max"))
         self.n_probe_points.set(Utils.getFloat("SurfAlign", "n_probe_points"))
+        self.z_probe_to_tool_offset.set(Utils.getFloat("SurfAlign", "z_probe_to_tool_offset"))
         
+    def saveConfig(self):
+        Utils.setFloat("SurfAlign", "mp_z_min", self.mp_z_min.get())
+        Utils.setFloat("SurfAlign", "mp_z_max", self.mp_z_max.get())
+        Utils.setFloat("SurfAlign", "n_probe_points", self.n_probe_points.get())
+        Utils.setFloat("SurfAlign", "z_probe_to_tool_offset", self.z_probe_to_tool_offset.get())
+        
+    def surface_align_gcode(self):
+        if self.z_probe_to_tool_offset.get() != "":
+            self.app.gcode.z_probe_to_tool_offset = float(self.z_probe_to_tool_offset.get())
+        else:
+            self.app.gcode.z_probe_to_tool_offset = 0 
+        self.app.insertCommand("SURF_ALIGN", True)
     
     def generate_probe(self):
         

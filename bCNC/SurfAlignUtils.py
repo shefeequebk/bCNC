@@ -13,6 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import re
 import math
+import winreg
 
 # import fabex addon
 import fabex
@@ -24,7 +25,43 @@ else:
     print("No register() function found in addon.")
 
 
-def setup_blender_scene(engrave_text, text_width_mm, text_height_mm, text_position_mm, rotation_degrees,
+def resolve_windows_font_path(display_name):
+    """
+    Given a display name like 'Arial' or 'Bahnschrift SemiLight SemiConde',
+    this function returns the actual font file path.
+    """
+    display_name = display_name.lower()
+    fonts_dir = os.path.join(os.environ["WINDIR"], "Fonts")
+
+    try:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts") as key:
+            for i in range(winreg.QueryInfoKey(key)[1]):
+                name, font_file, _ = winreg.EnumValue(key, i)
+                if display_name in name.lower():
+                    return os.path.join(fonts_dir, font_file)
+    except Exception as e:
+        print("🛑 Registry access failed:", e)
+
+    return None
+
+
+def resolve_font_path(font_name):
+    font_name = font_name.strip().lower()
+    fonts_dir = os.path.join(os.environ["WINDIR"], "Fonts")
+
+    try:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts") as key:
+            for i in range(0, winreg.QueryInfoKey(key)[1]):
+                display_name, font_file, _ = winreg.EnumValue(key, i)
+                if font_name in display_name.lower():
+                    return os.path.join(fonts_dir, font_file)
+    except Exception as e:
+        print(f"Registry access failed: {e}")
+
+    return None
+
+
+def setup_blender_scene(engrave_text, text_font, text_width_mm, text_height_mm, text_position_mm, rotation_degrees,
                         layer_height_mm, safe_height_mm, save_dir, feedrate_mm, spindle_rpm):
     blend_file_path = os.path.join(save_dir, "output.blend")
     # addon_name = "bl_ext.user_default.fabex"
@@ -67,6 +104,18 @@ def setup_blender_scene(engrave_text, text_width_mm, text_height_mm, text_positi
         bpy.ops.object.text_add(location=(0, 0, 0))
         text_obj = bpy.context.object
         text_obj.data.body = engrave_text
+
+        if text_font:
+            font_path = resolve_windows_font_path(text_font)
+            print("font_path", font_path)
+            if font_path:
+                vect_font = bpy.data.fonts.load(font_path)
+                text_obj.data.font = vect_font
+                print(f"Font '{text_font}' loaded successfully.")
+            else:
+                print(f"Font '{text_font}' not found.")
+        else:
+            print("No font selected.")
 
         # Convert Text to Mesh to Get Accurate Dimensions
         bpy.ops.object.convert(target='MESH')

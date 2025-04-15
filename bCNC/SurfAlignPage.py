@@ -7,6 +7,7 @@
 # import time
 import math
 import sys
+import winreg
 from tkinter import (
     YES,
     N,
@@ -54,7 +55,8 @@ from CNC import CNC, Block
 import os
 from SurfAlignUtils import setup_blender_scene
 from Helpers import N_
-
+import tkinter.font as tkFont 
+from tkinter import ttk
 __author__ = Utils.__author__
 __email__ = Utils.__email__
 
@@ -336,6 +338,19 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
     tlo = None
     probeCmd = None
 
+    def get_installed_font_names(self):
+        font_dir = os.path.join(os.environ['WINDIR'], 'Fonts')
+        font_names = []
+        try:
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts") as key:
+                for i in range(winreg.QueryInfoKey(key)[1]):
+                    raw_name, file_name, _ = winreg.EnumValue(key, i)
+                    clean_name = raw_name.split(' (')[0].strip()
+                    font_names.append(clean_name)
+        except Exception as e:
+            print("🛑 Error reading fonts:", e)
+        return sorted(set(font_names))
+
     def __init__(self, master, app):
         CNCRibbon.PageFrame.__init__(self, master, "GenGcode", app)
 
@@ -366,8 +381,27 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
             _("Set initial probe feed rate for tool change and calibration"),
         )
         self.addWidget(GenGcodeFrame.engraveText)
-        
-        
+
+        # Font selection dropdown
+        row += 1
+        col = 0
+        Label(lframe(), text=_("Font:")).grid(row=row, column=col, sticky=E)
+        col += 1
+
+        font_list = self.get_installed_font_names()
+
+        self.font_var = StringVar()
+        self.font_selector = ttk.Combobox(
+            lframe(),
+            textvariable=self.font_var,
+            values=font_list,
+            width=30,
+            state="readonly",
+        )
+        self.font_selector.grid(row=row, column=col, sticky=EW)
+        tkExtra.Balloon.set(self.font_selector, _("Select font for engraving text"))
+        self.addWidget(self.font_selector)
+
         # ----
         # Size (Height, Width)
         row += 1
@@ -508,6 +542,7 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         
     def loadConfig(self):
         self.engraveText.set(Utils.getStr("SurfAlign", "engraveText"))
+        self.font_var.set(Utils.getStr("SurfAlign", "textFont"))
         self.height.set(Utils.getFloat("SurfAlign", "height"))
         self.width.set(Utils.getFloat("SurfAlign", "width"))
         self.posX.set(Utils.getFloat("SurfAlign", "posX"))
@@ -522,6 +557,10 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
     def generateGcode(self):
         print("Generate Gcode")
         engrave_text = self.engraveText.get()
+        if self.font_var.get() == "":
+            text_font = None
+        else:
+            text_font = self.font_var.get()
         text_height_mm, text_width_mm = float(self.height.get()), float(self.width.get())
         text_position_mm = (float(self.posX.get()), float(self.posY.get()), -float(self.engraveDepth.get()))
         layer_height_mm = float(self.layerHeight.get())
@@ -530,7 +569,7 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         rotation_degrees = float(self.rotation.get())
         feedrate_mm = float(self.feedrate.get())
         spindle_rpm = float(self.spindleRPM.get())
-        gcode_file_path = setup_blender_scene(engrave_text, text_width_mm, text_height_mm, text_position_mm,rotation_degrees, layer_height_mm, safe_height_mm, save_dir, feedrate_mm, spindle_rpm)
+        gcode_file_path = setup_blender_scene(engrave_text, text_font, text_width_mm, text_height_mm, text_position_mm,rotation_degrees, layer_height_mm, safe_height_mm, save_dir, feedrate_mm, spindle_rpm)
         
         
         print("Generated Gcode file path:", gcode_file_path)
@@ -543,6 +582,7 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
     # # -----------------------------------------------------------------------
     def saveConfig(self):
         Utils.setStr("SurfAlign", "engraveText", self.engraveText.get())
+        Utils.setStr("SurfAlign", "textFont", self.font_var.get())
         Utils.setFloat("SurfAlign", "height", self.height.get())
         Utils.setFloat("SurfAlign", "width", self.width.get())
         Utils.setFloat("SurfAlign", "posX", self.posX.get())

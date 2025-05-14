@@ -580,22 +580,24 @@ class Sender:
         Send a single-character command ('1', '2', '3', or '4') to the BLTouch.
         """
         if self.blt_serial is None:
-            print("[ERROR] Serial port not initialized.")
-            return
+            print("[ERROR] BLTouch Serial port not initialized.")
+            return False
 
         if cmd in ['1', '2', '3', '4']:
-            self.ser.write(cmd.encode())
+            self.blt_serial.write(cmd.encode())
             print(f"[INFO] Sent command: {cmd}")
-            time.sleep(0.1)  # Wait briefly for response
+            time.sleep(0.2)  # Wait briefly for response
 
-            if self.ser.in_waiting:
-                response = self.ser.readline().decode(errors='ignore').strip()
+            if self.blt_serial.in_waiting:
+                response = self.blt_serial.readline().decode(errors='ignore').strip()
                 print(f"[INFO] Response: {response}")
                 return response
             else:
                 print("[INFO] No response received.")
+                return False
         else:
             print("[WARN] Invalid command. Use '1', '2', '3', or '4'.")
+            return False
 
     # ----------------------------------------------------------------------
     # Send to controller a gcode or command

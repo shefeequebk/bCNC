@@ -81,6 +81,7 @@ iniSystem = os.path.join(prgpath, f"{__prg__}.ini")
 iniUser = os.path.expanduser(f"~/.{__prg__}")
 hisFile = os.path.expanduser(f"~/.{__prg__}.history")
 
+print(f"[INFO] iniUser Path: {iniUser}")
 
 _ = gettext.translation(
     "bCNC", os.path.join(prgpath, "locale"), fallback=True

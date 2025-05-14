@@ -754,6 +754,7 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         mp_z_min = float(self.mp_z_min.get())
         mp_z_max = float(self.mp_z_max.get())
         lines = self.app.gcode.probe.multi_point_scan(self.probe_points, mp_z_min, mp_z_max)
+        self.app.blt_serial_send('1')
         self.app.run(lines)
         print("PROBE COMMAND:")
         print("\n".join(lines))

@@ -2565,7 +2565,7 @@ class Application(Tk, Sender):
         
     # -----------------------------------------------------------------------
     def blt_serial_send(self, cmd):
-        Sender.blt_serial_send(self, cmd)
+        return Sender.blt_serial_send(self, cmd)
 
     # -----------------------------------------------------------------------
     # An entry function should be called periodically during compiling
@@ -2599,6 +2599,17 @@ class Application(Tk, Sender):
                 _("Already running"), _("Please stop before"), parent=self
             )
             return
+        if self.blt_serial is None:
+            messagebox.showerror(
+                _("BLTouch Error"), _("BLTouch is not connected"), parent=self
+            )
+            return  
+        else:
+            if not self.blt_serial_send('2'): # Retract BLTouch
+                messagebox.showerror(
+                    _("BLTouch Error"), _("BLTouch is not connected"), parent=self
+                )
+                return
 
         self.editor.selectClear()
         self.selectionChange()

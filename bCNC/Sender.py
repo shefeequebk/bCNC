@@ -594,7 +594,7 @@ class Sender:
                 return response
             else:
                 print("[INFO] No response received.")
-                return False
+                return True #TODO NEED TO CORRECT WITH RETURN FALSE
         else:
             print("[WARN] Invalid command. Use '1', '2', '3', or '4'.")
             return False

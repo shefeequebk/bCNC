@@ -934,6 +934,7 @@ class CNC:
         "cutfeedz": 500.0,  # Material feed for cutting
         "safe": 3.0,
         "state": "",
+        "blt_state": "",
         "pins": "",
         "msg": "",
         "stepz": 1.0,

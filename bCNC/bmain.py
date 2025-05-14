@@ -337,6 +337,8 @@ class Application(Tk, Sender):
         self.bind("<<Paste>>", self.paste)
 
         self.bind("<<Connect>>", self.openClose)
+        
+        self.bind("<<BLTConnect>>", self.openCloseBLTouch)
 
         self.bind("<<New>>", self.newFile)
         self.bind("<<Open>>", self.loadDialog)
@@ -2529,6 +2531,41 @@ class Application(Tk, Sender):
             self.dro.updateState()
         except TclError:
             pass
+
+    # -----------------------------------------------------------------------
+    def openCloseBLTouch(self, event=None):
+        serialPage = Page.frames["BLTouch"]
+        if self.blt_serial is not None:
+            self.blt_serial_close()
+            serialPage.connectBtn.config(
+                text=_("Open"), background="Salmon", activebackground="Salmon"
+            )
+        else:
+            device = serialPage.portCombo.get()
+            baudrate = serialPage.baudCombo.get()
+            if self.blt_serial_open(device, baudrate):
+                serialPage.connectBtn.config(
+                    text=_("Close"), background="LightGreen", activebackground="LightGreen"
+                )
+                
+    # -----------------------------------------------------------------------
+    def blt_serial_open(self, device, baudrate):
+        try:
+            return Sender.blt_serial_open(self, device, baudrate)
+        except Exception:
+            self.blt_serial = None
+            messagebox.showerror(
+                _("Error opening serial"), sys.exc_info()[1], parent=self
+            )
+        return False
+    
+    # -----------------------------------------------------------------------
+    def blt_serial_close(self):
+        Sender.blt_serial_close(self)
+        
+    # -----------------------------------------------------------------------
+    def blt_serial_send(self, cmd):
+        Sender.blt_serial_send(self, cmd)
 
     # -----------------------------------------------------------------------
     # An entry function should be called periodically during compiling

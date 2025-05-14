@@ -100,6 +100,9 @@ class Sender:
         self.pendant = Queue()  # Command queue to be executed from Pendant
         self.serial = None
         self.thread = None
+        
+        # BLTouc
+        self.blt_serial = None
 
         self._posUpdate = False  # Update position
         self._probeUpdate = False  # Update probe
@@ -539,6 +542,60 @@ class Sender:
         self.serial = None
         CNC.vars["state"] = NOT_CONNECTED
         CNC.vars["color"] = STATECOLOR[CNC.vars["state"]]
+
+    # ----------------------------------------------------------------------
+    # BLTouch Serial
+    # ----------------------------------------------------------------------
+    def blt_serial_open(self, device, baudrate):
+        self.blt_serial = serial.serial_for_url(
+            device.replace("\\", "\\\\"),  # Escape for windows
+            baudrate,
+            bytesize=serial.EIGHTBITS,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            timeout=SERIAL_TIMEOUT,
+            xonxoff=False,
+            rtscts=False,
+        )
+        try:
+            self.blt_serial.setDTR(0)
+        except OSError:
+            pass
+        time.sleep(1)
+        CNC.vars["blt_state"] = CONNECTED
+        return True
+    
+    def blt_serial_close(self):
+        if self.blt_serial is None:
+            return
+        try:
+            self.blt_serial.close()
+        except Exception:
+            pass
+        self.blt_serial = None
+        CNC.vars["blt_state"] = NOT_CONNECTED
+
+    def blt_serial_send(self, cmd):
+        """
+        Send a single-character command ('1', '2', '3', or '4') to the BLTouch.
+        """
+        if self.blt_serial is None:
+            print("[ERROR] Serial port not initialized.")
+            return
+
+        if cmd in ['1', '2', '3', '4']:
+            self.ser.write(cmd.encode())
+            print(f"[INFO] Sent command: {cmd}")
+            time.sleep(0.1)  # Wait briefly for response
+
+            if self.ser.in_waiting:
+                response = self.ser.readline().decode(errors='ignore').strip()
+                print(f"[INFO] Response: {response}")
+                return response
+            else:
+                print("[INFO] No response received.")
+        else:
+            print("[WARN] Invalid command. Use '1', '2', '3', or '4'.")
 
     # ----------------------------------------------------------------------
     # Send to controller a gcode or command

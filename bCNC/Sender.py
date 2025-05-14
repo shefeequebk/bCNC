@@ -93,7 +93,7 @@ class Sender:
 
         CNC.loadConfig(Utils.config)
         self.gcode = GCode()
-        self.cnc = self.gcode.cnc
+        self.gcode.probe.app = self
 
         self.log = Queue()  # Log queue returned from GRBL
         self.queue = Queue()  # Command queue to be send to GRBL

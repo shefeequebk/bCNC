@@ -154,6 +154,8 @@ class Probe:
         self.multi_probe_points = []
         self.no_of_points = 0
 
+        self.app = None
+
     # ----------------------------------------------------------------------
     def clear(self):
         del self.points[:]
@@ -372,6 +374,7 @@ class Probe:
             if len(self.multi_probe_points) >= self.no_of_points:
                 self.start = False
                 self.is_multi_point_scan = False
+                self.app.blt_serial_send('2') # Retract BLTouch
             print("Multi-point scan points: ", self.multi_probe_points)
 
     # ----------------------------------------------------------------------

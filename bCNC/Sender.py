@@ -93,7 +93,7 @@ class Sender:
 
         CNC.loadConfig(Utils.config)
         self.gcode = GCode()
-        self.cnc = self.gcode.cnc
+        self.gcode.probe.app = self
 
         self.log = Queue()  # Log queue returned from GRBL
         self.queue = Queue()  # Command queue to be send to GRBL
@@ -580,24 +580,26 @@ class Sender:
         Send a single-character command ('1', '2', '3', or '4') to the BLTouch.
         """
         if self.blt_serial is None:
-            print("[ERROR] BLTouch Serial port not initialized.")
-            return False
+            print("[ERROR] Serial port not initialized.")
+            return
 
         if cmd in ['1', '2', '3', '4']:
-            self.blt_serial.write(cmd.encode())
+            self.ser.write(cmd.encode())
             print(f"[INFO] Sent command: {cmd}")
-            time.sleep(0.2)  # Wait briefly for response
+            time.sleep(0.1)  # Wait briefly for response
 
-            if self.blt_serial.in_waiting:
-                response = self.blt_serial.readline().decode(errors='ignore').strip()
+            if self.ser.in_waiting:
+                response = self.ser.readline().decode(errors='ignore').strip()
                 print(f"[INFO] Response: {response}")
                 return response
             else:
                 print("[INFO] No response received.")
+<<<<<<< HEAD
                 return True #TODO NEED TO CORRECT WITH RETURN FALSE
+=======
+>>>>>>> parent of ae32b84 (Enhance BLTouch functionality with improved error handling and command feedback. Updated UI labels for SurfAlign connection and added debug information for user paths.)
         else:
             print("[WARN] Invalid command. Use '1', '2', '3', or '4'.")
-            return False
 
     # ----------------------------------------------------------------------
     # Send to controller a gcode or command

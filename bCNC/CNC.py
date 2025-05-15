@@ -2503,6 +2503,8 @@ class GCode:
         self.orient = Orient()
         self.vars = {}  # local variables
         self.surf_align_probe_points = []
+        self.x_probe_to_tool_offset = 0
+        self.y_probe_to_tool_offset = 0
         self.z_probe_to_tool_offset = 0
         self.init()
 
@@ -3792,7 +3794,12 @@ class GCode:
         if points.ndim != 2 or points.shape[1] < 3:
             print("❌ Error: 'multi_probe_points' must be a list of 3D points (X, Y, Z)")
             return None
-        X, Y, Z = points[:, 0], points[:, 1], points[:, 2]
+        
+        # Apply probe-to-tool offsets to X and Y coordinates
+        X = points[:, 0] - self.x_probe_to_tool_offset
+        Y = points[:, 1] - self.y_probe_to_tool_offset
+        Z = points[:, 2]
+        
         A = self.build_vandermonde(X, Y, degree)
         coeffs, *_ = np.linalg.lstsq(A, Z, rcond=None)  # least squares solution
         return coeffs

@@ -751,6 +751,14 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         Utils.setFloat("SurfAlign", "z_probe_to_tool_offset", self.z_probe_to_tool_offset.get())
         
     def surface_align_gcode(self):
+        if  self.x_probe_to_tool_offset.get() != "":
+            self.app.gcode.x_probe_to_tool_offset = float(self.x_probe_to_tool_offset.get())
+        else:
+            self.app.gcode.x_probe_to_tool_offset = 0
+        if self.y_probe_to_tool_offset.get() != "":
+            self.app.gcode.y_probe_to_tool_offset = float(self.y_probe_to_tool_offset.get())
+        else:
+            self.app.gcode.y_probe_to_tool_offset = 0
         if self.z_probe_to_tool_offset.get() != "":
             self.app.gcode.z_probe_to_tool_offset = float(self.z_probe_to_tool_offset.get())
         else:

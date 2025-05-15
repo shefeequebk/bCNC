@@ -3846,7 +3846,7 @@ class GCode:
                         for x, y, z in self.probe.splitLine_surf_align(x1, y1, z1, x2,
                                                                        y2, z2, poly_plane_coeffs, poly_plane_degree,
                                                                        step_size=1):
-                            z += z_probe_offset
+                            z -= z_probe_offset
                             new.append(
                                 "".join([
                                     f"G{int(g)}",

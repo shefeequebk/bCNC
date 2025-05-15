@@ -659,6 +659,43 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         self.probe_coverage_method.fill(self.probe_coverage_methods)
         self.probe_coverage_method.set("EvenCoverage")
         self.addWidget(self.probe_coverage_method)
+        
+        
+        
+        # --- ALL Axis Offset (Probe → Tool) ---
+        row+=1
+        col = 0
+        Label(frame, text=_("Offset (Probe → Tool):")).grid(row=row, column=col, sticky=E)
+        row+=1
+        col = 0
+        self.x_probe_to_tool_offset = tkExtra.FloatEntry(
+            frame, background=tkExtra.GLOBAL_CONTROL_BACKGROUND
+        )
+        self.x_probe_to_tool_offset.grid(row=row, column=col, sticky=EW)
+        tkExtra.Balloon.set(
+            self.x_probe_to_tool_offset, _("X offset (mm) between probe and tool.")
+        )
+        self.addWidget(self.x_probe_to_tool_offset)
+        col += 1
+        self.y_probe_to_tool_offset = tkExtra.FloatEntry(
+            frame, background=tkExtra.GLOBAL_CONTROL_BACKGROUND
+        )
+        self.y_probe_to_tool_offset.grid(row=row, column=col, sticky=EW)
+        tkExtra.Balloon.set(
+            self.y_probe_to_tool_offset, _("Y offset (mm) between probe and tool.")
+        )   
+        self.addWidget(self.y_probe_to_tool_offset)
+        col += 1
+        self.z_probe_to_tool_offset = tkExtra.FloatEntry(
+            frame, background=tkExtra.GLOBAL_CONTROL_BACKGROUND
+        )
+        self.z_probe_to_tool_offset.grid(row=row, column=col, sticky=EW)
+        tkExtra.Balloon.set(
+            self.z_probe_to_tool_offset, _("Z offset (mm) between probe and tool.")
+        )
+        self.addWidget(self.z_probe_to_tool_offset)
+        
+        # --- Generate Probe & Show Probe Points & Start Probing ---
 
         row += 1
         col = 0
@@ -672,23 +709,18 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         show_button.grid(row=row, column=col, sticky=W)
         self.addWidget(show_button)
 
+
+
+        
+        
         col += 1
         probe_generate_b = Button(frame, text=_("Start Probing"), command=self.start_probing)
         probe_generate_b.grid(row=row, column=col, sticky=W)
         self.addWidget(probe_generate_b)
         
-        row+=1
-        col = 0
-        Label(frame, text=_("Z Offset (Probe → Tool):")).grid(row=row, column=col, sticky=E)
-        col += 1
-        self.z_probe_to_tool_offset = tkExtra.FloatEntry(
-            frame, background=tkExtra.GLOBAL_CONTROL_BACKGROUND
-        )
-        self.z_probe_to_tool_offset.grid(row=row, column=col, sticky=EW)
-        tkExtra.Balloon.set(
-            self.z_probe_to_tool_offset, _("Z offset (mm) between probe and tool, will be negative if tool head is below probe point")
-        )
-        self.addWidget(self.z_probe_to_tool_offset)
+        
+
+        
         
         
         row += 1
@@ -706,12 +738,16 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         self.mp_z_min.set(Utils.getFloat("SurfAlign", "mp_z_min"))
         self.mp_z_max.set(Utils.getFloat("SurfAlign", "mp_z_max"))
         self.n_probe_points.set(Utils.getFloat("SurfAlign", "n_probe_points"))
+        self.x_probe_to_tool_offset.set(Utils.getFloat("SurfAlign", "x_probe_to_tool_offset"))
+        self.y_probe_to_tool_offset.set(Utils.getFloat("SurfAlign", "y_probe_to_tool_offset"))
         self.z_probe_to_tool_offset.set(Utils.getFloat("SurfAlign", "z_probe_to_tool_offset"))
         
     def saveConfig(self):
         Utils.setFloat("SurfAlign", "mp_z_min", self.mp_z_min.get())
         Utils.setFloat("SurfAlign", "mp_z_max", self.mp_z_max.get())
         Utils.setFloat("SurfAlign", "n_probe_points", self.n_probe_points.get())
+        Utils.setFloat("SurfAlign", "x_probe_to_tool_offset", self.x_probe_to_tool_offset.get())
+        Utils.setFloat("SurfAlign", "y_probe_to_tool_offset", self.y_probe_to_tool_offset.get())
         Utils.setFloat("SurfAlign", "z_probe_to_tool_offset", self.z_probe_to_tool_offset.get())
         
     def surface_align_gcode(self):
@@ -750,10 +786,24 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         if len(self.probe_points) == 0:
             messagebox.showwarning(_("Probe error"), _("No probe points found"))
             return
+        
+        if self.x_probe_to_tool_offset.get() != "":
+            x_probe_to_tool_offset = float(self.x_probe_to_tool_offset.get())
+        else:
+            x_probe_to_tool_offset = 0
+        if self.y_probe_to_tool_offset.get() != "":
+            y_probe_to_tool_offset = float(self.y_probe_to_tool_offset.get())
+        else:
+            y_probe_to_tool_offset = 0
+        if self.z_probe_to_tool_offset.get() != "":
+            z_probe_to_tool_offset = float(self.z_probe_to_tool_offset.get())
+        else:
+            z_probe_to_tool_offset = 0
+            
         print("Start Probing")
         mp_z_min = float(self.mp_z_min.get())
         mp_z_max = float(self.mp_z_max.get())
-        lines = self.app.gcode.probe.multi_point_scan(self.probe_points, mp_z_min, mp_z_max)
+        lines = self.app.gcode.probe.multi_point_scan(self.probe_points, mp_z_min, mp_z_max, x_probe_to_tool_offset, y_probe_to_tool_offset, z_probe_to_tool_offset)
         self.app.blt_serial_send('1')
         self.app.run(lines)
         print("PROBE COMMAND:")

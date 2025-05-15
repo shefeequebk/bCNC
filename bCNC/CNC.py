@@ -316,26 +316,26 @@ class Probe:
         lines.append(f"G0X{self.xmin:.4f}Y{self.ymin:.4f}")
         return lines
 
-    def multi_point_scan(self, probe_points, mp_z_min, mp_z_max):
+    def multi_point_scan(self, probe_points, mp_z_min, mp_z_max, x_probe_to_tool_offset, y_probe_to_tool_offset, z_probe_to_tool_offset):
         self.clear()
         self.start = True
         self.makeMatrix()
         self.is_multi_point_scan = True
         lines = []
         self.no_of_points = len(probe_points)
-        lines.append(f"G0Z{mp_z_max:.4f}")
-        lines.append(f"G0X{self.xmin:.4f}Y{self.ymin:.4f}")
+        lines.append(f"G0Z{mp_z_max+z_probe_to_tool_offset:.4f}")
+        lines.append(f"G0X{self.xmin+x_probe_to_tool_offset:.4f}Y{self.ymin+y_probe_to_tool_offset:.4f}")
         for point in probe_points:
-            lines.append(f"G0Z{mp_z_max:.4f}")
-            lines.append(f"G0X{point[0]:.4f}Y{point[1]:.4f}")
+            lines.append(f"G0Z{mp_z_max+z_probe_to_tool_offset:.4f}")
+            lines.append(f"G0X{point[0]+x_probe_to_tool_offset:.4f}Y{point[1]+y_probe_to_tool_offset:.4f}")
             lines.append("%wait")  # added for smoothie
             lines.append(
-                f"{CNC.vars['prbcmd']}Z{mp_z_min:.4f}"
+                f"{CNC.vars['prbcmd']}Z{mp_z_min+z_probe_to_tool_offset:.4f}"
                 f"F{CNC.vars['prbfeed']:g}"
             )
             lines.append("%wait")  # added for smoothie
-        lines.append(f"G0Z{mp_z_max:.4f}")
-        lines.append(f"G0X{self.xmin:.4f}Y{self.ymin:.4f}")
+        lines.append(f"G0Z{mp_z_max+z_probe_to_tool_offset:.4f}")
+        lines.append(f"G0X{self.xmin+x_probe_to_tool_offset:.4f}Y{self.ymin+y_probe_to_tool_offset:.4f}")
         return lines
 
     # ----------------------------------------------------------------------
@@ -3875,8 +3875,8 @@ class GCode:
         print("Surf Align G-Code")
 
         # self.probe.multi_probe_points = [[-3.861, 18.207, 0], [4.7, -22.876, -1], [-4.7, -3.686, 0],
-        #                                  [4.701, 7.0, -3], [4.701, -11, 2]]  # Remove this, test probe points
-
+        #                                  [4.701, 7.0, -3], [4.701, -11, 2]]  # TODO: Remove this, test probe points
+        
         if self.probe.multi_probe_points is None or len(self.probe.multi_probe_points) < self.probe.no_of_points:
             print("No Multi-Point Probe Points, or not enough points")
             return

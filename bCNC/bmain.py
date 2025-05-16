@@ -1357,7 +1357,7 @@ class Application(Tk, Sender):
         focus = self.focus_get()
         if focus in (self.canvas, self.editor):
             self.editor.copy()
-            self.ribbon.changePage("Editor")
+            # self.ribbon.changePage("Editor")
             self.editor.selectAll()
             self.selectionChange()
             return "break"

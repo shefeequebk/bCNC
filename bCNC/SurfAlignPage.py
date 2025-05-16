@@ -7,6 +7,7 @@
 # import time
 import math
 import sys
+import time
 import winreg
 from tkinter import (
     YES,
@@ -725,7 +726,13 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         
         row += 1
         col = 0
-        Label(frame, text=_("Surface Align G-Code:")).grid(row=row, column=col, sticky=E)
+        select_all_button = Button(
+            frame,
+            text=_("Select All"),
+            command=lambda: self.app.event_generate("<<SelectAll>>")
+        )
+        select_all_button.grid(row=row, column=col, sticky=W)
+        self.addWidget(select_all_button)
         col += 1
         surf_align_gcode_b = Button(frame, text=_("Surface Align G-Code"), command=self.surface_align_gcode)
         surf_align_gcode_b.grid(row=row, column=col, sticky=W)
@@ -811,8 +818,15 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         print("Start Probing")
         mp_z_min = float(self.mp_z_min.get())
         mp_z_max = float(self.mp_z_max.get())
+        
+        # --- Deploy Probe ---
+        safe_z = mp_z_max + z_probe_to_tool_offset
+        self.app.run([f"G0Z{safe_z:.4f}"])     # Move Z-up before Deploy Probe
+        time.sleep(.5)
+        self.app.blt_serial_send('1')          # Deploy Probe
+
+        # --- Probing ---
         lines = self.app.gcode.probe.multi_point_scan(self.probe_points, mp_z_min, mp_z_max, x_probe_to_tool_offset, y_probe_to_tool_offset, z_probe_to_tool_offset)
-        self.app.blt_serial_send('1')
         self.app.run(lines)
         print("PROBE COMMAND:")
         print("\n".join(lines))

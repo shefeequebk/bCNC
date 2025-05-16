@@ -821,7 +821,8 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         
         # --- Deploy Probe ---
         safe_z = mp_z_max + z_probe_to_tool_offset
-        self.app.run([f"G0Z{safe_z:.4f}"])     # Move Z-up before Deploy Probe
+        # self.app.run([f"G0Z{safe_z:.4f}"])     # Move Z-up before Deploy Probe
+        self.app.mcontrol.jog(f"Z{safe_z:.4f}")
         time.sleep(.5)
         self.app.blt_serial_send('1')          # Deploy Probe
 

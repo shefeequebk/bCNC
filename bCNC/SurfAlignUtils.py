@@ -133,6 +133,9 @@ def setup_blender_scene(engrave_text, text_font, text_width_mm, text_height_mm, 
         text_obj.location = text_pos_meters
         text_obj.rotation_euler = (0, 0, math.radians(rotation_degrees))  # Convert to radians
 
+        bpy.ops.object.origin_set(type='ORIGIN_CENTER_OF_MASS', center='MEDIAN')
+        bpy.context.object.location[1] = 0
+
         bpy.ops.scene.cam_operation_add()
 
         bpy.ops.wm.save_as_mainfile(filepath=blend_file_path)

@@ -3886,13 +3886,13 @@ class GCode:
         
         if self.probe.multi_probe_points is None or len(self.probe.multi_probe_points) < self.probe.no_of_points:
             print("No Multi-Point Probe Points, or not enough points")
-            return
+            return None
 
         degree = 1
         poly_plane_coeffs = self.fit_polynomial_surface_numpy(self.probe.multi_probe_points, degree=degree)
         if poly_plane_coeffs is None:
             print("❌ Polynomial fitting failed. Aborting surface align.")
-            return
+            return None
         print("Poly Plane Coeffs: ", poly_plane_coeffs, "degree: ", degree)
         undoinfo = []
         operation = "surf_align"
@@ -3926,7 +3926,9 @@ class GCode:
             if math.isinf(total_bounds[key]):
                 total_bounds[key] = None
 
-        print("✅ Total Bounds (min/max):", total_bounds)
+        # print("✅ Total Bounds (min/max):", total_bounds)
+        
+        return total_bounds
 
     # ----------------------------------------------------------------------
     # Return string representation of whole file
@@ -5767,12 +5769,12 @@ class GCode:
         ax.legend()
         plt.show()
 
-    def generate_and_plot_probing_points(self, method="EvenCoverage", k=5):
+    def generate_and_plot_probing_points(self, method="EvenCoverage", k=5, show_plot=False):
         print("Generating Probing Points")
         x_coords, y_coords, z_coords = self.make_cutting_points()
         if len(x_coords) == 0 or len(y_coords) == 0:
             messagebox.showwarning(_("Probe error"), _("No cutting points found"))
-            return
+            return None
         x_min, x_max = np.min(x_coords), np.max(x_coords)
         y_min, y_max = np.min(y_coords), np.max(y_coords)
         points = np.array([(x, y) for x, y in zip(x_coords, y_coords)])
@@ -5781,7 +5783,8 @@ class GCode:
             optimal_centers = self.min_max_distance_k_centers_by_points(points, k)
             self.surf_align_probe_points = optimal_centers
             # Call the new plotting function
-            self.plot_results_by_points(points, optimal_centers)
+            if show_plot:
+                self.plot_results_by_points(points, optimal_centers)
 
         elif method == "AreaCoverage":
             # Find the optimal centers by rectangle
@@ -5790,6 +5793,7 @@ class GCode:
             optimal_centers = self.find_optimal_centers_by_rectangle(rectangle, points, k)
             self.surf_align_probe_points = optimal_centers
             # Call the new plotting function
-            self.plot_rectangle_and_centers(rectangle, points, optimal_centers)
+            if show_plot:
+                self.plot_rectangle_and_centers(rectangle, points, optimal_centers)
 
         return optimal_centers

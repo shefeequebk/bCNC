@@ -62,7 +62,7 @@ def resolve_font_path(font_name):
 
 
 def setup_blender_scene(engrave_text, text_font, text_width_mm, text_height_mm, text_position_mm, rotation_degrees,
-                        layer_height_mm, safe_height_mm, save_dir, feedrate_mm, spindle_rpm):
+                        layer_height_mm, safe_height_mm, save_dir, feedrate_mm, spindle_rpm, final_height_mm):
     blend_file_path = os.path.join(save_dir, "output.blend")
     # addon_name = "bl_ext.user_default.fabex"
 
@@ -148,6 +148,9 @@ def setup_blender_scene(engrave_text, text_font, text_width_mm, text_height_mm, 
         bpy.context.scene.cam_operations[0].outlines_count = 2
         bpy.context.scene.cam_operations[0].feedrate = feedrate_mm / 1000
         bpy.context.scene.cam_operations[0].spindle_rpm = spindle_rpm
+        bpy.context.scene.cam_operations[0].output_trailer = True
+        bpy.context.scene.cam_operations[0].gcode_trailer = f"G00 X0Y0Z{final_height_mm}"
+
 
         bpy.ops.object.calculate_cam_path()
 

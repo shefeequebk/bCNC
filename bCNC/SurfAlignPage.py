@@ -58,6 +58,7 @@ from SurfAlignUtils import setup_blender_scene
 from Helpers import N_
 import tkinter.font as tkFont 
 from tkinter import ttk
+import threading
 __author__ = Utils.__author__
 __email__ = Utils.__email__
 
@@ -530,6 +531,20 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
             self.safeHeight, _("Safe Height"))
         self.addWidget(self.safeHeight)
         
+        # ----  
+        # Final Height
+        row += 1
+        col = 0
+        Label(frame, text=_("Final Height:")).grid(row=row, column=col, sticky=E)
+        col += 1
+        self.finalHeight = tkExtra.FloatEntry(
+            frame, background=tkExtra.GLOBAL_CONTROL_BACKGROUND
+        )
+        self.finalHeight.grid(row=row, column=col, sticky=EW)
+        tkExtra.Balloon.set(
+            self.finalHeight, _("Height to move to after engraving is complete"))
+        self.addWidget(self.finalHeight)
+        
         col += 1
         generate_b = Button(frame, text=_("Generate"), command=self.generateGcode, padx=2, pady=1)
         generate_b.grid(row=row, column=col, sticky=EW)
@@ -554,6 +569,7 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         self.engraveDepth.set(Utils.getFloat("SurfAlign", "engraveDepth"))
         self.layerHeight.set(Utils.getFloat("SurfAlign", "layerHeight"))
         self.safeHeight.set(Utils.getFloat("SurfAlign", "safeHeight"))
+        self.finalHeight.set(Utils.getFloat("SurfAlign", "finalHeight"))
         
     def generateGcode(self):
         print("Generate Gcode")
@@ -566,11 +582,12 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         text_position_mm = (float(self.posX.get()), float(self.posY.get()), -float(self.engraveDepth.get()))
         layer_height_mm = float(self.layerHeight.get())
         safe_height_mm = float(self.safeHeight.get())
+        final_height_mm = float(self.finalHeight.get())
         save_dir = os.path.dirname(__file__)
         rotation_degrees = float(self.rotation.get())
         feedrate_mm = float(self.feedrate.get())
         spindle_rpm = float(self.spindleRPM.get())
-        gcode_file_path = setup_blender_scene(engrave_text, text_font, text_width_mm, text_height_mm, text_position_mm,rotation_degrees, layer_height_mm, safe_height_mm, save_dir, feedrate_mm, spindle_rpm)
+        gcode_file_path = setup_blender_scene(engrave_text, text_font, text_width_mm, text_height_mm, text_position_mm, rotation_degrees, layer_height_mm, safe_height_mm, save_dir, feedrate_mm, spindle_rpm, final_height_mm)
         
         
         print("Generated Gcode file path:", gcode_file_path)
@@ -594,6 +611,7 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         Utils.setFloat("SurfAlign", "engraveDepth", self.engraveDepth.get())
         Utils.setFloat("SurfAlign", "layerHeight", self.layerHeight.get())
         Utils.setFloat("SurfAlign", "safeHeight", self.safeHeight.get())
+        Utils.setFloat("SurfAlign", "finalHeight", self.finalHeight.get())
 
 
 
@@ -642,6 +660,8 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         self.mp_z_max.grid(row=row, column=col, sticky=EW)
         tkExtra.Balloon.set(
             self.mp_z_max, _("Z safe to move"))
+
+
         
         # feed command
         row += 1
@@ -696,6 +716,8 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         )
         self.addWidget(self.z_probe_to_tool_offset)
         
+        
+        
         # --- Generate Probe & Show Probe Points & Start Probing ---
 
         row += 1
@@ -737,7 +759,53 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         surf_align_gcode_b = Button(frame, text=_("Surface Align G-Code"), command=self.surface_align_gcode)
         surf_align_gcode_b.grid(row=row, column=col, sticky=W)
         self.addWidget(surf_align_gcode_b)
+        
+        
+                # Add new Z safety limit field
+        row += 1
+        col = 0
+        Label(frame, text=_("Z Min Safety Limit:")).grid(row=row, column=col, sticky=E)
+        col += 1
+        self.z_safety_limit = tkExtra.FloatEntry(
+            frame, background=tkExtra.GLOBAL_CONTROL_BACKGROUND
+        )
+        self.z_safety_limit.grid(row=row, column=col, sticky=EW)
+        tkExtra.Balloon.set(
+            self.z_safety_limit, _("Program will prevent execution if any G-code command Z coordinate goes below this point"))
+        self.addWidget(self.z_safety_limit)
+        
+        # Add Quick Align & Run button with green color
+        col += 1
+        quick_align_run_b = Button(
+            frame, 
+            text=_("Quick Align & Run"), 
+            command=self.quick_align_run,
+            bg="#4CAF50",  # Material Design Green
+            fg="white",    # White text
+            activebackground="#45a049",  # Slightly darker green when pressed
+            activeforeground="white"
+        )
+        quick_align_run_b.grid(row=row, column=col, sticky=W)
+        self.addWidget(quick_align_run_b)
+        
+        # Add detailed tooltip
+        tkExtra.Balloon.set(
+            quick_align_run_b, 
+            _("Quick Align & Run\n\n"
+              "Performs a complete surface alignment process:\n"
+              "1. Generate probe points\n"
+              "2. Start probing\n"
+              "3. Select all points\n"
+              "4. Surface align G-code\n"
+              "5. Run the G-code\n\n"
+              "Use this button to quickly align and run in one step.")
+        )
+        
+        
 
+        
+        
+        
         frame.grid_columnconfigure(1, weight=1)
         self.loadConfig()
         
@@ -748,6 +816,7 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         self.x_probe_to_tool_offset.set(Utils.getFloat("SurfAlign", "x_probe_to_tool_offset"))
         self.y_probe_to_tool_offset.set(Utils.getFloat("SurfAlign", "y_probe_to_tool_offset"))
         self.z_probe_to_tool_offset.set(Utils.getFloat("SurfAlign", "z_probe_to_tool_offset"))
+        self.z_safety_limit.set(Utils.getFloat("SurfAlign", "z_safety_limit"))
         
     def saveConfig(self):
         Utils.setFloat("SurfAlign", "mp_z_min", self.mp_z_min.get())
@@ -756,6 +825,7 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         Utils.setFloat("SurfAlign", "x_probe_to_tool_offset", self.x_probe_to_tool_offset.get())
         Utils.setFloat("SurfAlign", "y_probe_to_tool_offset", self.y_probe_to_tool_offset.get())
         Utils.setFloat("SurfAlign", "z_probe_to_tool_offset", self.z_probe_to_tool_offset.get())
+        Utils.setFloat("SurfAlign", "z_safety_limit", self.z_safety_limit.get())
         
     def surface_align_gcode(self):
         if  self.x_probe_to_tool_offset.get() != "":
@@ -770,17 +840,22 @@ class MultiPointProbe(CNCRibbon.PageFrame):
             self.app.gcode.z_probe_to_tool_offset = float(self.z_probe_to_tool_offset.get())
         else:
             self.app.gcode.z_probe_to_tool_offset = 0 
-        self.app.insertCommand("SURF_ALIGN", True)
+        # self.app.insertCommand("SURF_ALIGN", True)
+        bounds = self.app.gcode.surf_align_gcode(self.app.editor.getSelectedBlocks())
+        self.app.drawAfter()
     
-    def generate_probe(self):
+    def generate_probe(self, show_plot=True):
         
         no_of_points = int(float(self.n_probe_points.get()))
         if no_of_points < 3:
             messagebox.showwarning(_("Probe error"), _("Number of probe points must be greater than 2"))
-            return
+            return False
 
-        self.probe_points = self.app.gcode.generate_and_plot_probing_points(method=self.probe_coverage_method.get(), k=no_of_points)
-        
+        self.probe_points = self.app.gcode.generate_and_plot_probing_points(method=self.probe_coverage_method.get(), k=no_of_points, show_plot=show_plot)
+        if self.probe_points is None:
+            return False
+        return True
+    
     def show_probe_points(self):
         """Display a popup window with the probe points."""
         if len(self.probe_points) == 0:
@@ -798,9 +873,9 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         close_button.pack(side=BOTTOM)
 
     def start_probing(self):
-        if len(self.probe_points) == 0:
+        if self.probe_points is None or len(self.probe_points) == 0:
             messagebox.showwarning(_("Probe error"), _("No probe points found"))
-            return
+            return False
         
         if self.x_probe_to_tool_offset.get() != "":
             x_probe_to_tool_offset = float(self.x_probe_to_tool_offset.get())
@@ -832,6 +907,48 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         print("PROBE COMMAND:")
         print("\n".join(lines))
 
+    def quick_align_run(self):
+        # Create and start a new thread for the alignment process
+        threading.Thread(target=self._quick_align_thread, daemon=True).start()
+
+    def _quick_align_thread(self):
+        # Implementation of quick alignment in a separate thread
+        success = self.generate_probe(show_plot=False)
+        print("PROBE POINTS GENERATED", success)
+        if success == False:
+            return
+        success = self.start_probing()
+        print("PROBING STARTED", success)
+        if success == False:
+            return
+        while self.app.running:
+            time.sleep(0.1)
+        print("PROBING COMPLETED")
+        # Use after() to safely update UI from the thread
+        self.app.after(0, self._process_alignment_results)
+
+    def _process_alignment_results(self):
+        self.app.selectAll()
+        bounds = self.app.gcode.surf_align_gcode(self.app.editor.getSelectedBlocks())
+        self.app.drawAfter()
+        print("SURF ALIGN GCODE COMPLETED")
+        if bounds is None:
+            messagebox.showwarning(_("Probing Error"), _("No probe points found"))
+            return
+        z_min = bounds.get("z_min")
+        if z_min is None:
+            messagebox.showwarning(_("Probing Error"), _("No probe points found"))
+            return
+
+        print("Bounds: ", bounds)
+        if z_min < float(self.z_safety_limit.get()):
+            # self.app.undo()
+            self.app.event_generate("<<Undo>>")
+            messagebox.showwarning(_("Safety Limit Error"), _("Z-min is below the safety limit. Please adjust the Z-min safety limit."))
+            return
+        print("GCODE RUNNING")
+        self.app.run()
+        print("GCODE RUN COMMANDS SEND")
 
 # =============================================================================
 # Probe Page

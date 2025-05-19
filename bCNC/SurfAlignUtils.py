@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import re
 import math
 import winreg
+import mathutils
 
 # import fabex addon
 import fabex
@@ -134,8 +135,16 @@ def setup_blender_scene(engrave_text, text_font, text_width_mm, text_height_mm, 
         text_obj.rotation_euler = (0, 0, math.radians(rotation_degrees))  # Convert to radians
 
         bpy.ops.object.origin_set(type='ORIGIN_CENTER_OF_MASS', center='MEDIAN')
-        bpy.context.object.location[1] = 0
-
+        # bpy.context.object.location[1] = 0
+        
+        # Move the object along its local Y axis by that distance
+        obj = bpy.context.object
+        point = mathutils.Vector((text_position_mm[0], text_position_mm[1], text_position_mm[2]))/1000  # Replace with your target point
+        local_y_world = obj.matrix_world.to_quaternion() @ mathutils.Vector((0, 1, 0))
+        vec_to_point = point - obj.location
+        signed_distance = vec_to_point.dot(local_y_world)
+        obj.location += local_y_world * signed_distance
+    
         bpy.ops.scene.cam_operation_add()
 
         bpy.ops.wm.save_as_mainfile(filepath=blend_file_path)

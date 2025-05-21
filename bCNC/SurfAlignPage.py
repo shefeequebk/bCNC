@@ -906,10 +906,12 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         self.app.run(lines)
         print("PROBE COMMAND:")
         print("\n".join(lines))
+        return True
 
     def quick_align_run(self):
         # Create and start a new thread for the alignment process
-        threading.Thread(target=self._quick_align_thread, daemon=True).start()
+        # threading.Thread(target=self._quick_align_thread, daemon=True).start()
+        self._quick_align_thread()
 
     def _quick_align_thread(self):
         # Implementation of quick alignment in a separate thread
@@ -932,37 +934,37 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         # self.app.after(0, self._process_alignment_results)
         
         # Start polling from main UI thread to check if probing is complete
-        self.app.after(300, self._poll_probe_status)
+        self.app.after(1000, self._poll_probe_status)
         
     def _poll_probe_status(self):
         if self.app.gcode.probe.start_multi_point_scan:
             print("WAITING (after loop)")
-            self.app.after(100, self._poll_probe_status)  # Check again in 100ms
+            self.app.after(300, self._poll_probe_status)  # Check again in 100ms
         else:
             print("PROBING COMPLETED")
-            self._process_alignment_results()
+            self.app.after(2000, self._process_alignment_results)
 
     def _process_alignment_results(self):
-        self.app.selectAll()
-        bounds = self.app.gcode.surf_align_gcode(self.app.editor.getSelectedBlocks())
+
+        bounds = self.app.gcode.surf_align_gcode(self.app.editor.getAllBlocks())
         self.app.drawAfter()
+        print("Bounds: ", bounds)
         print("SURF ALIGN GCODE COMPLETED")
         if bounds is None:
-            messagebox.showwarning(_("Probing Error"), _("No probe points found"))
+            messagebox.showwarning(_("Probing Error 0"), _("No probe points found 0"))
             return
         z_min = bounds.get("z_min")
         if z_min is None:
-            messagebox.showwarning(_("Probing Error"), _("No probe points found"))
+            messagebox.showwarning(_("Probing Error 1"), _("No probe points found 1"))
             return
 
-        print("Bounds: ", bounds)
         if z_min < float(self.z_safety_limit.get()):
             # self.app.undo()
             self.app.event_generate("<<Undo>>")
             messagebox.showwarning(_("Safety Limit Error"), _("Z-min is below the safety limit. Please adjust the Z-min safety limit."))
             return
         print("GCODE RUNNING")
-        self.app.run()
+        # self.app.run()
         print("GCODE RUN COMMANDS SEND")
 
 # =============================================================================

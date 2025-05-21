@@ -917,15 +917,30 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         print("PROBE POINTS GENERATED", success)
         if success == False:
             return
+        self.app.gcode.probe.start_multi_point_scan=True
         success = self.start_probing()
         print("PROBING STARTED", success)
         if success == False:
             return
-        while self.app.running:
-            time.sleep(0.1)
-        print("PROBING COMPLETED")
-        # Use after() to safely update UI from the thread
-        self.app.after(0, self._process_alignment_results)
+        # time.sleep(1)
+        # print("XXXXXXXXXXXX", self.app.gcode.probe.start_multi_point_scan)
+        # while self.app.gcode.probe.start_multi_point_scan:
+        #     print("WAITING")
+        #     time.sleep(0.1)
+        # print("PROBING COMPLETED")
+        # # Use after() to safely update UI from the thread
+        # self.app.after(0, self._process_alignment_results)
+        
+        # Start polling from main UI thread to check if probing is complete
+        self.app.after(300, self._poll_probe_status)
+        
+    def _poll_probe_status(self):
+        if self.app.gcode.probe.start_multi_point_scan:
+            print("WAITING (after loop)")
+            self.app.after(100, self._poll_probe_status)  # Check again in 100ms
+        else:
+            print("PROBING COMPLETED")
+            self._process_alignment_results()
 
     def _process_alignment_results(self):
         self.app.selectAll()

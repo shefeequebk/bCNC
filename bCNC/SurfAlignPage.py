@@ -947,6 +947,19 @@ class MultiPointProbe(CNCRibbon.PageFrame):
 
     def _process_alignment_results(self):
 
+        if  self.x_probe_to_tool_offset.get() != "":
+            self.app.gcode.x_probe_to_tool_offset = float(self.x_probe_to_tool_offset.get())
+        else:
+            self.app.gcode.x_probe_to_tool_offset = 0
+        if self.y_probe_to_tool_offset.get() != "":
+            self.app.gcode.y_probe_to_tool_offset = float(self.y_probe_to_tool_offset.get())
+        else:
+            self.app.gcode.y_probe_to_tool_offset = 0
+        if self.z_probe_to_tool_offset.get() != "":
+            self.app.gcode.z_probe_to_tool_offset = float(self.z_probe_to_tool_offset.get())
+        else:
+            self.app.gcode.z_probe_to_tool_offset = 0
+
         bounds = self.app.gcode.surf_align_gcode(self.app.editor.getAllBlocks())
         self.app.drawAfter()
         print("Bounds: ", bounds)

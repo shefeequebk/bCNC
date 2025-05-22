@@ -913,6 +913,7 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         # threading.Thread(target=self._quick_align_thread, daemon=True).start()
         self._quick_align_thread()
 
+
     def _quick_align_thread(self):
         # Implementation of quick alignment in a separate thread
         success = self.generate_probe(show_plot=False)
@@ -963,9 +964,14 @@ class MultiPointProbe(CNCRibbon.PageFrame):
             self.app.event_generate("<<Undo>>")
             messagebox.showwarning(_("Safety Limit Error"), _("Z-min is below the safety limit. Please adjust the Z-min safety limit."))
             return
+        self.app.after(1000, self._gcode_run_command)
+
+        
+    def _gcode_run_command(self):
         print("GCODE RUNNING")
-        # self.app.run()
+        self.app.run()
         print("GCODE RUN COMMANDS SEND")
+
 
 # =============================================================================
 # Probe Page

@@ -2447,7 +2447,7 @@ class Application(Tk, Sender):
         if filename:
             fn, ext = os.path.splitext(filename)
             ext = ext.lower()
-            gcode = GCode()
+            gcode = GCode(self)
             if ext == ".dxf":
                 gcode.importDXF(filename)
             elif ext == ".svg":

@@ -124,7 +124,8 @@ def getValue(name, new, old, default=0.0):
 # Probing class and linear interpolation
 # =============================================================================
 class Probe:
-    def __init__(self):
+    def __init__(self, app=None):
+        self.app = app
         self.init()
 
     # ----------------------------------------------------------------------
@@ -155,7 +156,6 @@ class Probe:
         self.start_multi_point_scan = False
         self.no_of_points = 0
 
-        self.app = None
 
     # ----------------------------------------------------------------------
     def clear(self):
@@ -2497,12 +2497,13 @@ class GCode:
     LOOP_MERGE = False
 
     # ----------------------------------------------------------------------
-    def __init__(self):
+    def __init__(self, app=None):
+        self.app = app
         self.cnc = CNC()
         self.header = ""
         self.footer = ""
         self.undoredo = undo.UndoRedo()
-        self.probe = Probe()
+        self.probe = Probe(app)
         self.orient = Orient()
         self.vars = {}  # local variables
         self.surf_align_probe_points = []

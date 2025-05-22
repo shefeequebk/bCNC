@@ -92,8 +92,7 @@ class Sender:
         self.controllerSet("GRBL1")
 
         CNC.loadConfig(Utils.config)
-        self.gcode = GCode()
-        self.gcode.probe.app = self
+        self.gcode = GCode(self)
 
         self.cnc = self.gcode.cnc
 

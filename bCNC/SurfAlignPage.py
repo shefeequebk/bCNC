@@ -623,6 +623,7 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         
         
         self.probe_points = []  # Dummy list of (X, Y) coordinates
+        self.stop_quick_align = False
         
         # UI Elements
         lframe = tkExtra.ExLabelFrame(self, text=_("Multi-Point Surface Probe"), foreground="DarkBlue")
@@ -775,7 +776,8 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         self.addWidget(self.z_safety_limit)
         
         # Add Quick Align & Run button with green color
-        col += 1
+        row += 1
+        col = 0
         quick_align_run_b = Button(
             frame, 
             text=_("Quick Align & Run"), 
@@ -800,6 +802,20 @@ class MultiPointProbe(CNCRibbon.PageFrame):
               "5. Run the G-code\n\n"
               "Use this button to quickly align and run in one step.")
         )
+        
+                
+        col += 1
+        quick_align_stop_b = Button(
+            frame,
+            text=_("Stop Running"), 
+            command=self.quick_align_stop,
+            bg="#F44336",  # Material Design Red
+            fg="white",    # White text
+            activebackground="#d32f2f",  # Darker red when pressed
+            activeforeground="white"
+        )
+        quick_align_stop_b.grid(row=row, column=col, sticky=W)
+        
         
         
 
@@ -909,8 +925,7 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         return True
 
     def quick_align_run(self):
-        # Create and start a new thread for the alignment process
-        # threading.Thread(target=self._quick_align_thread, daemon=True).start()
+        self.stop_quick_align = False
         self._quick_align_thread()
 
 
@@ -925,27 +940,28 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         print("PROBING STARTED", success)
         if success == False:
             return
-        # time.sleep(1)
-        # print("XXXXXXXXXXXX", self.app.gcode.probe.start_multi_point_scan)
-        # while self.app.gcode.probe.start_multi_point_scan:
-        #     print("WAITING")
-        #     time.sleep(0.1)
-        # print("PROBING COMPLETED")
-        # # Use after() to safely update UI from the thread
-        # self.app.after(0, self._process_alignment_results)
+        if self.check_quick_align_stop():
+            print("STOPPED QUICK ALIGN WHEN PROBING 0")
+            return
         
         # Start polling from main UI thread to check if probing is complete
         self.app.after(1000, self._poll_probe_status)
         
     def _poll_probe_status(self):
+        if self.check_quick_align_stop():
+            print("STOPPED QUICK ALIGN WHEN PROBING 1")
+            return
         if self.app.gcode.probe.start_multi_point_scan:
-            print("WAITING (after loop)")
             self.app.after(300, self._poll_probe_status)  # Check again in 100ms
         else:
             print("PROBING COMPLETED")
             self.app.after(2000, self._process_alignment_results)
 
     def _process_alignment_results(self):
+        
+        if self.check_quick_align_stop():
+            print("STOPPED QUICK ALIGN WHEN PROCESSING ALIGNMENT RESULTS")
+            return
 
         if  self.x_probe_to_tool_offset.get() != "":
             self.app.gcode.x_probe_to_tool_offset = float(self.x_probe_to_tool_offset.get())
@@ -981,11 +997,25 @@ class MultiPointProbe(CNCRibbon.PageFrame):
 
         
     def _gcode_run_command(self):
-        print("GCODE RUNNING")
+        
+        if self.check_quick_align_stop():
+            print("STOPPED QUICK ALIGN PRVENTED RUNNING GCODE")
+            return
+        
         self.app.run()
-        print("GCODE RUN COMMANDS SEND")
-
-
+        print("GCODE RUN COMMAND SEND")
+        
+        
+    def check_quick_align_stop(self):
+        if self.stop_quick_align:
+            self.app.gcode.probe.start_multi_point_scan = False
+            self.stop_quick_align = False
+            print("STOPPED QUICK ALIGN WHEN RUNNING")
+            return True
+        return False
+        
+    def quick_align_stop(self):
+        self.stop_quick_align = True
 # =============================================================================
 # Probe Page
 # =============================================================================

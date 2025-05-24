@@ -2328,6 +2328,10 @@ class Application(Tk, Sender):
 
     # -----------------------------------------------------------------------
     def fileModified(self):
+        page = self.ribbon.getActivePage()
+        # Skip message box if SurfAlign page is active
+        if page.name == "SurfAlign":
+            return False
         if self.gcode.isModified():
             ans = messagebox.askquestion(
                 _("File modified"),
@@ -2368,13 +2372,18 @@ class Application(Tk, Sender):
                 return
 
             if not self.gcode.probe.isEmpty():
-                ans = messagebox.askquestion(
-                    _("Existing Autolevel"),
-                    _("Autolevel/probe information already exists.\nDelete it?"),
-                    parent=self,
-                )
-                if ans == messagebox.YES or ans is True:
+                # Skip message box if SurfAlign page is active
+                page = self.ribbon.getActivePage()
+                if page.name == "SurfAlign":
                     self.gcode.probe.init()
+                else:
+                    ans = messagebox.askquestion(
+                        _("Existing Autolevel"),
+                        _("Autolevel/probe information already exists.\nDelete it?"),
+                        parent=self,
+                    )
+                    if ans == messagebox.YES or ans is True:
+                        self.gcode.probe.init()
 
         self.setStatus(_("Loading: {} ...").format(filename), True)
         Sender.load(self, filename)

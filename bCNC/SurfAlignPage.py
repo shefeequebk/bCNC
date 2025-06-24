@@ -59,6 +59,8 @@ from Helpers import N_
 import tkinter.font as tkFont 
 from tkinter import ttk
 import threading
+from tkinter import Tk, font
+
 __author__ = Utils.__author__
 __email__ = Utils.__email__
 
@@ -390,7 +392,7 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         Label(lframe(), text=_("Font:")).grid(row=row, column=col, sticky=E)
         col += 1
 
-        font_list = self.get_installed_font_names()
+        font_list = sorted(set(font.families()))
 
         self.font_var = StringVar()
         self.font_selector = ttk.Combobox(

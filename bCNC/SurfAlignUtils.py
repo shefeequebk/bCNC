@@ -62,7 +62,7 @@ def resolve_font_path(font_name):
     return None
 
 
-def setup_blender_scene(engrave_text, text_font, text_width_mm, text_height_mm, text_position_mm, rotation_degrees,
+def setup_blender_scene(engrave_text, text_font, text_font_size, text_position_mm, rotation_degrees,
                         layer_height_mm, safe_height_mm, save_dir, feedrate_mm, spindle_rpm, final_height_mm):
     blend_file_path = os.path.join(save_dir, "output.blend")
     # addon_name = "bl_ext.user_default.fabex"
@@ -103,6 +103,8 @@ def setup_blender_scene(engrave_text, text_font, text_width_mm, text_height_mm, 
 
         # Add text object
         bpy.ops.object.text_add(location=(0, 0, 0))
+        bpy.context.object.data.size = text_font_size/1000
+        
         text_obj = bpy.context.object
         text_obj.data.body = engrave_text
 
@@ -126,9 +128,7 @@ def setup_blender_scene(engrave_text, text_font, text_width_mm, text_height_mm, 
         dimensions = text_obj.dimensions
         print("Actual Dimensions After Conversion:", dimensions)
 
-        # Scale text object to fit within 50mm x 100mm while keeping aspect ratio
-        scale_factor = min(text_width_mm / (dimensions.x * 1000), text_height_mm / (dimensions.y * 1000))
-        text_obj.scale = (scale_factor, scale_factor, scale_factor)
+
         text_pos_meters = (text_position_mm[0] / 1000, text_position_mm[1] / 1000, text_position_mm[2] / 1000)
         # Move text object to a new location (e.g., (0, 0, 1))
         text_obj.location = text_pos_meters
@@ -148,8 +148,6 @@ def setup_blender_scene(engrave_text, text_font, text_width_mm, text_height_mm, 
         bpy.ops.scene.cam_operation_add()
 
         bpy.ops.wm.save_as_mainfile(filepath=blend_file_path)
-
-        print(f"COMPLETED! Text is properly sized to {text_width_mm}mm x {text_height_mm}mm")
 
         bpy.context.scene.cam_operations[0].cut_type = 'ONLINE'
         bpy.context.scene.cam_operations[0].stepdown = layer_height_mm / 1000  # layer height

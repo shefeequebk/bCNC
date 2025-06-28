@@ -407,25 +407,18 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         self.addWidget(self.font_selector)
 
         # ----
-        # Size (Height, Width)
+        # Font Size 
         row += 1
         col = 0
-        Label(lframe(), text=_("Size (H, W):")).grid(row=row, column=col, sticky=E)
+        Label(lframe(), text=_("Font Size:")).grid(row=row, column=col, sticky=E)
         col += 1
-        self.height = tkExtra.FloatEntry(
+        self.fontSize = tkExtra.FloatEntry(
             lframe(), background=tkExtra.GLOBAL_CONTROL_BACKGROUND
         )
-        self.height.grid(row=row, column=col, sticky=EW)
+        self.fontSize.grid(row=row, column=col, sticky=EW)
         tkExtra.Balloon.set(
-            self.height, _("Engrave Text Height"))
+            self.fontSize, _("Engrave Text Size"))
 
-        col += 1
-        self.width = tkExtra.FloatEntry(
-            lframe(), background=tkExtra.GLOBAL_CONTROL_BACKGROUND
-        )
-        self.width.grid(row=row, column=col, sticky=EW)
-        tkExtra.Balloon.set(
-            self.width, _("Engrave Text Width"))
         
         # ----
         # Pos (X, Y)
@@ -561,8 +554,7 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
     def loadConfig(self):
         self.engraveText.set(Utils.getStr("SurfAlign", "engraveText"))
         self.font_var.set(Utils.getStr("SurfAlign", "textFont"))
-        self.height.set(Utils.getFloat("SurfAlign", "height"))
-        self.width.set(Utils.getFloat("SurfAlign", "width"))
+        self.fontSize.set(Utils.getFloat("SurfAlign", "fontSize"))
         self.posX.set(Utils.getFloat("SurfAlign", "posX"))
         self.posY.set(Utils.getFloat("SurfAlign", "posY"))
         self.rotation.set(Utils.getFloat("SurfAlign", "rotation"))
@@ -580,7 +572,7 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
             text_font = None
         else:
             text_font = self.font_var.get()
-        text_height_mm, text_width_mm = float(self.height.get()), float(self.width.get())
+        text_font_size = float(self.fontSize.get())
         text_position_mm = (float(self.posX.get()), float(self.posY.get()), -float(self.engraveDepth.get()))
         layer_height_mm = float(self.layerHeight.get())
         safe_height_mm = float(self.safeHeight.get())
@@ -589,7 +581,17 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         rotation_degrees = float(self.rotation.get())
         feedrate_mm = float(self.feedrate.get())
         spindle_rpm = float(self.spindleRPM.get())
-        gcode_file_path = setup_blender_scene(engrave_text, text_font, text_width_mm, text_height_mm, text_position_mm, rotation_degrees, layer_height_mm, safe_height_mm, save_dir, feedrate_mm, spindle_rpm, final_height_mm)
+        gcode_file_path = setup_blender_scene(engrave_text,
+                                              text_font,
+                                               text_font_size,
+                                               text_position_mm,
+                                               rotation_degrees,
+                                               layer_height_mm,
+                                               safe_height_mm,
+                                               save_dir,
+                                               feedrate_mm,
+                                               spindle_rpm,
+                                               final_height_mm)
         
         
         print("Generated Gcode file path:", gcode_file_path)
@@ -603,8 +605,7 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
     def saveConfig(self):
         Utils.setStr("SurfAlign", "engraveText", self.engraveText.get())
         Utils.setStr("SurfAlign", "textFont", self.font_var.get())
-        Utils.setFloat("SurfAlign", "height", self.height.get())
-        Utils.setFloat("SurfAlign", "width", self.width.get())
+        Utils.setFloat("SurfAlign", "fontSize", self.fontSize.get())
         Utils.setFloat("SurfAlign", "posX", self.posX.get())
         Utils.setFloat("SurfAlign", "posY", self.posY.get())
         Utils.setFloat("SurfAlign", "rotation", self.rotation.get())

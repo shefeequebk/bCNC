@@ -9,6 +9,7 @@ import math
 import sys
 import time
 import winreg
+import re
 from tkinter import (
     YES,
     N,
@@ -24,6 +25,7 @@ from tkinter import (
     CENTER,
     NONE,
     X,
+    Y,
     BOTH,
     LEFT,
     TOP,
@@ -45,6 +47,10 @@ from tkinter import (
     LabelFrame,
     messagebox,
     Radiobutton,
+    Toplevel,
+    Frame,
+    VERTICAL,
+    Scrollbar,
 )
 
 import Camera
@@ -60,6 +66,7 @@ import tkinter.font as tkFont
 from tkinter import ttk
 import threading
 from tkinter import Tk, font
+import tkinter
 
 __author__ = Utils.__author__
 __email__ = Utils.__email__
@@ -419,11 +426,56 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         tkExtra.Balloon.set(
             self.fontSize, _("Engrave Text Size"))
 
+        row += 1
+        col = 0
+        Label(lframe(), text=_("Text Positioning:")).grid(row=row, column=col, sticky=E)
+        col += 1
+        self.textPositioning_var = StringVar()
+        self.textPositioning_selector = ttk.Combobox(
+            lframe(),
+            textvariable=self.textPositioning_var,
+            values=["Lid Center", "Direct"],
+            width=30,
+            state="readonly",
+        )
+        self.textPositioning_selector.grid(row=row, column=col, sticky=EW)
+        tkExtra.Balloon.set(self.textPositioning_selector, _("Select text positioning method"))
+        self.addWidget(self.textPositioning_selector)
+        
+        # Bind the callback to show/hide lid selector
+        self.textPositioning_selector.bind('<<ComboboxSelected>>', self.on_text_positioning_change)
+        
+        # ---- Lid Selector
+        lid_list_str = Utils.getStr("SurfAlign", "lidList")
+        self.lid_list = [lid.strip() for lid in lid_list_str.split(",") if lid.strip()] if lid_list_str and lid_list_str.strip() else []
+        
+        row += 1
+        col = 0
+        self.lid_label = Label(lframe(), text=_("Lid Name:"))
+        self.lid_label.grid(row=row, column=col, sticky=E)
+        col += 1
+        self.lidName = StringVar()
+        self.lidName_selector = ttk.Combobox(lframe(), textvariable=self.lidName, values=self.lid_list, width=30, state="readonly")
+        self.lidName_selector.grid(row=row, column=col, sticky=EW)
+        tkExtra.Balloon.set(self.lidName_selector, _("Select lid name"))
+        self.addWidget(self.lidName_selector)
+        
+        col += 1
+        self.edit_lid_button = Button(lframe(), text=_("Edit"), command=self.show_edit_lid_dialog, padx=2, pady=1)
+        self.edit_lid_button.grid(row=row, column=col, sticky=EW)
+        tkExtra.Balloon.set(self.edit_lid_button, _("Edit lid names list"))
+        self.addWidget(self.edit_lid_button)
+        
+        # Initially hide the lid selector (will be shown when "Lid Center" is selected)
+        self.lid_label.grid_remove()
+        self.lidName_selector.grid_remove()
+        self.edit_lid_button.grid_remove()
         
         # ----
         # Pos (X, Y)
         row, col = row + 1, 0
-        Label(lframe(), text=_("Pos:")).grid(row=row, column=col, sticky=E)
+        self.pos_label = Label(lframe(), text=_("Center Pos:"))
+        self.pos_label.grid(row=row, column=col, sticky=E)
 
         col += 1
         self.posX = tkExtra.FloatEntry(
@@ -440,6 +492,10 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         self.posY.grid(row=row, column=col, sticky=EW)
         tkExtra.Balloon.set(self.posY, _("Engrave Text Center Position Y"))
         self.addWidget(self.posY)
+        
+        self.pos_label.grid_remove()
+        self.posX.grid_remove()
+        self.posY.grid_remove()
         
         # ----  
         # Rotation
@@ -557,6 +613,8 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         self.fontSize.set(Utils.getFloat("SurfAlign", "fontSize"))
         self.posX.set(Utils.getFloat("SurfAlign", "posX"))
         self.posY.set(Utils.getFloat("SurfAlign", "posY"))
+        self.textPositioning_var.set(Utils.getStr("SurfAlign", "textPositioningMode"))
+        self.lidName.set(Utils.getStr("SurfAlign", "lidName"))
         self.rotation.set(Utils.getFloat("SurfAlign", "rotation"))
         self.feedrate.set(Utils.getFloat("SurfAlign", "feedrate"))
         self.spindleRPM.set(Utils.getFloat("SurfAlign", "spindleRPM"))
@@ -564,6 +622,8 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         self.layerHeight.set(Utils.getFloat("SurfAlign", "layerHeight"))
         self.safeHeight.set(Utils.getFloat("SurfAlign", "safeHeight"))
         self.finalHeight.set(Utils.getFloat("SurfAlign", "finalHeight"))
+        
+        self.on_text_positioning_change(None)
         
     def generateGcode(self):
         print("Generate Gcode")
@@ -573,7 +633,13 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         else:
             text_font = self.font_var.get()
         text_font_size = float(self.fontSize.get())
-        text_position_mm = (float(self.posX.get()), float(self.posY.get()), -float(self.engraveDepth.get()))
+        lid_positioning_mode = self.textPositioning_var.get()
+        if lid_positioning_mode == "Direct":
+            text_position_mm = (float(self.posX.get()), float(self.posY.get()), -float(self.engraveDepth.get()))
+        else:
+            lid_width, lid_height = self.get_lid_dimensions()
+            print(f"Lid width: {lid_width}, Lid height: {lid_height}")
+            text_position_mm = ((lid_width / 2), -1 * (lid_height / 2), -float(self.engraveDepth.get()))
         layer_height_mm = float(self.layerHeight.get())
         safe_height_mm = float(self.safeHeight.get())
         final_height_mm = float(self.finalHeight.get())
@@ -608,6 +674,9 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         Utils.setFloat("SurfAlign", "fontSize", self.fontSize.get())
         Utils.setFloat("SurfAlign", "posX", self.posX.get())
         Utils.setFloat("SurfAlign", "posY", self.posY.get())
+        Utils.setStr("SurfAlign", "textPositioningMode", self.textPositioning_var.get())
+        Utils.setStr("SurfAlign", "lidName", self.lidName.get())
+        Utils.setStr("SurfAlign", "lidList", ",".join(self.lid_list))
         Utils.setFloat("SurfAlign", "rotation", self.rotation.get())
         Utils.setFloat("SurfAlign", "feedrate", self.feedrate.get())
         Utils.setFloat("SurfAlign", "spindleRPM", self.spindleRPM.get())
@@ -617,7 +686,209 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         Utils.setFloat("SurfAlign", "finalHeight", self.finalHeight.get())
 
 
+    def on_text_positioning_change(self, event):
+        """Callback function to show/hide lid selector based on text positioning selection."""
+        lid_positioning_mode = self.textPositioning_var.get()
+        lid_center_widgets = [self.lid_label, self.lidName_selector, self.edit_lid_button]
+        pos_widgets = [self.pos_label, self.posX, self.posY]
+        
+        if lid_positioning_mode == "Lid Center":
+            [widget.grid() for widget in lid_center_widgets]
+            [widget.grid_remove() for widget in pos_widgets]
+        elif lid_positioning_mode == "Direct":
+            [widget.grid_remove() for widget in lid_center_widgets]
+            [widget.grid() for widget in pos_widgets]
 
+        
+
+    def show_edit_lid_dialog(self):
+        """Show a popup dialog for adding/deleting lid names."""
+        dialog = Toplevel(self)
+        dialog.title(_("Add/Delete Lid"))
+        dialog.geometry("400x500")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+        dialog.geometry("+%d+%d" % (self.winfo_rootx() + 50, self.winfo_rooty() + 50))
+        
+        # Add new lid section
+        add_frame = LabelFrame(dialog, text=_("Add New Lid"), padx=10, pady=10)
+        add_frame.pack(fill=X, padx=10, pady=(10, 5))
+        
+        Label(add_frame, text=_("Lid Name:")).grid(row=0, column=0, sticky=W, pady=(0, 5))
+        new_lid_entry = Entry(add_frame, background=tkExtra.GLOBAL_CONTROL_BACKGROUND, width=25)
+        new_lid_entry.grid(row=1, column=0, columnspan=2, sticky=EW, pady=(0, 5))
+        new_lid_entry.focus_set()
+        
+        Label(add_frame, text=_("Format: {name}-{height}x{width} (e.g., Vitamin_XL_Pill-300x1200)"), 
+              fg="gray", font=("TkDefaultFont", 8)).grid(row=2, column=0, columnspan=2, sticky=W, pady=(0, 5))
+        
+        Label(add_frame, text=_("Note: All dimensions are in millimeters (mm)"), 
+              fg="blue", font=("TkDefaultFont", 8)).grid(row=3, column=0, columnspan=2, sticky=W, pady=(0, 5))
+        
+        add_button = Button(add_frame, text=_("Add"), command=lambda: self.add_lid_from_dialog(new_lid_entry.get().strip(), dialog, lid_listbox), padx=10, pady=2)
+        add_button.grid(row=4, column=0, sticky=W, pady=(5, 0))
+        
+        # Existing lids section
+        existing_frame = LabelFrame(dialog, text=_("Existing Lids"), padx=10, pady=10)
+        existing_frame.pack(fill=BOTH, expand=True, padx=10, pady=(5, 10))
+        
+        # Listbox with scrollbar for existing lids
+        list_frame = Frame(existing_frame)
+        list_frame.pack(fill=BOTH, expand=True)
+        
+        lid_listbox = tkinter.Listbox(list_frame, height=8)
+        lid_listbox.pack(side=LEFT, fill=BOTH, expand=True)
+        
+        scrollbar = tkinter.Scrollbar(list_frame, orient=VERTICAL, command=lid_listbox.yview)
+        scrollbar.pack(side=RIGHT, fill=Y)
+        lid_listbox.config(yscrollcommand=scrollbar.set)
+        
+        # Populate listbox with existing lids
+        for lid in self.lid_list:
+            lid_listbox.insert(END, lid)
+        
+        # Delete button
+        delete_button = Button(existing_frame, text=_("Delete Selected"), 
+                              command=lambda: self.delete_lid_from_dialog(lid_listbox, dialog), 
+                              padx=10, pady=2, bg="#F44336", fg="white")
+        delete_button.pack(pady=(5, 0))
+        
+        # Bottom buttons
+        button_frame = Frame(dialog)
+        button_frame.pack(fill=X, padx=10, pady=(0, 10))
+        
+        Button(button_frame, text=_("Close"), command=dialog.destroy, padx=10, pady=2).pack(side=RIGHT)
+        
+        # Bind events
+        new_lid_entry.bind('<Return>', lambda event: self.add_lid_from_dialog(new_lid_entry.get().strip(), dialog, lid_listbox))
+        dialog.bind('<Escape>', lambda event: dialog.destroy())
+        
+        add_frame.columnconfigure(1, weight=1)
+
+    def validate_lid_format(self, lid_name):
+        """Validate that the lid name follows the format {name}-{height}x{width}."""
+        if not lid_name or '-' not in lid_name or 'x' not in lid_name:
+            return _("Lid name must follow format: {name}-{height}x{width}")
+        
+        parts = lid_name.split('-')
+        if len(parts) != 2 or not parts[0] or not re.match(r'^[a-zA-Z0-9_]+$', parts[0]):
+            return _("Name part must contain only letters, numbers, and underscores")
+        
+        dimensions = parts[1].split('x')
+        if len(dimensions) != 2:
+            return _("Dimensions must be in format: {height}x{width}")
+        
+        try:
+            height, width = int(dimensions[0]), int(dimensions[1])
+            if height <= 0 or width <= 0:
+                return _("Height and width must be positive numbers")
+        except ValueError:
+            return _("Height and width must be valid numbers")
+        
+        return None  # Valid
+
+    def extract_lid_dimensions(self, lid_name):
+        """Extract height and width from a valid lid name."""
+        if self.validate_lid_format(lid_name):
+            return None, None
+        try:
+            parts = lid_name.split('-')[1].split('x')
+            return int(parts[0]), int(parts[1])
+        except (IndexError, ValueError):
+            return None, None
+
+    def add_lid_from_dialog(self, new_lid_name, dialog, lid_listbox):
+        """Add a new lid name from the dialog and close it."""
+        if not new_lid_name:
+            messagebox.showwarning(_("Empty Entry"), _("Please enter a lid name."), parent=dialog)
+            return
+        
+        error_message = self.validate_lid_format(new_lid_name)
+        if error_message:
+            messagebox.showwarning(_("Invalid Format"), error_message, parent=dialog)
+            return
+        
+        if new_lid_name in self.lid_list:
+            messagebox.showwarning(_("Duplicate Entry"), _("This lid name already exists in the list."), parent=dialog)
+            return
+
+        self.lid_list.append(new_lid_name)
+        self.lidName_selector['values'] = self.lid_list
+        self.lidName.set(new_lid_name)
+        
+        # Refresh the listbox
+        lid_listbox.delete(0, END)
+        for lid in self.lid_list:
+            lid_listbox.insert(END, lid)
+        
+        self.saveConfig()
+        messagebox.showinfo(_("Success"), _("Lid name '{}' has been added to the list.").format(new_lid_name), parent=dialog)
+
+    def delete_lid_from_dialog(self, lid_listbox, dialog):
+        """Delete a selected lid name from the list."""
+        selected_index = lid_listbox.curselection()
+        if not selected_index:
+            messagebox.showwarning(_("No Selection"), _("Please select a lid to delete."), parent=dialog)
+            return
+            
+        selected_lid = lid_listbox.get(selected_index[0])
+        
+        # Confirm deletion
+        if not messagebox.askyesno(_("Confirm Delete"), 
+                                  _("Are you sure you want to delete '{}'?").format(selected_lid), 
+                                  parent=dialog):
+            return
+            
+        self.lid_list.remove(selected_lid)
+        self.lidName_selector['values'] = self.lid_list
+        
+        # Clear the current selection if it was the deleted one
+        if self.lidName.get() == selected_lid:
+            self.lidName.set("")
+        
+        # Refresh the listbox
+        lid_listbox.delete(0, END)
+        for lid in self.lid_list:
+            lid_listbox.insert(END, lid)
+        
+        self.saveConfig()
+        messagebox.showinfo(_("Success"), _("Lid name '{}' has been deleted from the list.").format(selected_lid), parent=dialog)
+
+    def get_lid_dimensions(self):
+        """Extract width and height from the currently selected lid name in the selector.
+        
+        Returns:
+            tuple: (width, height) in mm, or (None, None) if no lid selected or invalid format
+        """
+        lid_name = self.lidName.get()
+        if not lid_name:
+            return None, None
+            
+        # Validate the format first
+        error_message = self.validate_lid_format(lid_name)
+        if error_message:
+            return None, None
+            
+        try:
+            # Split by '-' to get the dimensions part
+            parts = lid_name.split('-')
+            if len(parts) != 2:
+                return None, None
+                
+            # Split the dimensions part by 'x' to get width and height
+            dimensions = parts[1].split('x')
+            if len(dimensions) != 2:
+                return None, None
+                
+            # Convert to integers - format is "name-widthxheight"
+            width = int(dimensions[0])
+            height = int(dimensions[1])
+            
+            return width, height
+            
+        except (ValueError, IndexError):
+            return None, None
 
 class MultiPointProbe(CNCRibbon.PageFrame):
     def __init__(self, master, app):

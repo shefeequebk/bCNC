@@ -466,10 +466,33 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         tkExtra.Balloon.set(self.edit_lid_button, _("Edit lid names list"))
         self.addWidget(self.edit_lid_button)
         
+        row += 1
+        col = 0
+        self.center_offset_label = Label(lframe(), text=_("Offset (mm):"))
+        self.center_offset_label.grid(row=row, column=col, sticky=E)
+        col += 1
+        self.center_offset_x = tkExtra.FloatEntry(
+            lframe(), background=tkExtra.GLOBAL_CONTROL_BACKGROUND
+        )
+        self.center_offset_x.grid(row=row, column=col, sticky=EW)
+        tkExtra.Balloon.set(self.center_offset_x, _("Text Position Offset from Lid Center X"))
+        self.addWidget(self.center_offset_x)
+        
+        col += 1
+        self.center_offset_y = tkExtra.FloatEntry(
+            lframe(), background=tkExtra.GLOBAL_CONTROL_BACKGROUND
+        )
+        self.center_offset_y.grid(row=row, column=col, sticky=EW)
+        tkExtra.Balloon.set(self.center_offset_y, _("Text Position Offset from Lid Center Y"))
+        self.addWidget(self.center_offset_y)
+        
         # Initially hide the lid selector (will be shown when "Lid Center" is selected)
         self.lid_label.grid_remove()
         self.lidName_selector.grid_remove()
         self.edit_lid_button.grid_remove()
+        self.center_offset_label.grid_remove()
+        self.center_offset_x.grid_remove()
+        self.center_offset_y.grid_remove()
         
         # ----
         # Pos (X, Y)
@@ -615,6 +638,8 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         self.posY.set(Utils.getFloat("SurfAlign", "posY"))
         self.textPositioning_var.set(Utils.getStr("SurfAlign", "textPositioningMode"))
         self.lidName.set(Utils.getStr("SurfAlign", "lidName"))
+        self.center_offset_x.set(Utils.getFloat("SurfAlign", "centerOffsetX"))
+        self.center_offset_y.set(Utils.getFloat("SurfAlign", "centerOffsetY"))
         self.rotation.set(Utils.getFloat("SurfAlign", "rotation"))
         self.feedrate.set(Utils.getFloat("SurfAlign", "feedrate"))
         self.spindleRPM.set(Utils.getFloat("SurfAlign", "spindleRPM"))
@@ -628,6 +653,7 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
     def generateGcode(self):
         print("Generate Gcode")
         engrave_text = self.engraveText.get()
+        work_area_width, work_area_height = 500, 500
         if self.font_var.get() == "":
             text_font = None
         else:
@@ -638,8 +664,10 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
             text_position_mm = (float(self.posX.get()), float(self.posY.get()), -float(self.engraveDepth.get()))
         else:
             lid_width, lid_height = self.get_lid_dimensions()
-            print(f"Lid width: {lid_width}, Lid height: {lid_height}")
-            text_position_mm = ((lid_width / 2), -1 * (lid_height / 2), -float(self.engraveDepth.get()))
+            work_area_width, work_area_height = lid_width, lid_height
+            text_position_x = (lid_width / 2) + float(self.center_offset_x.get())
+            text_position_y = (-1 * (lid_height / 2)) + float(self.center_offset_y.get())
+            text_position_mm = (text_position_x, text_position_y, -float(self.engraveDepth.get()))
         layer_height_mm = float(self.layerHeight.get())
         safe_height_mm = float(self.safeHeight.get())
         final_height_mm = float(self.finalHeight.get())
@@ -647,22 +675,39 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         rotation_degrees = float(self.rotation.get())
         feedrate_mm = float(self.feedrate.get())
         spindle_rpm = float(self.spindleRPM.get())
-        gcode_file_path = setup_blender_scene(engrave_text,
-                                              text_font,
-                                               text_font_size,
-                                               text_position_mm,
-                                               rotation_degrees,
-                                               layer_height_mm,
-                                               safe_height_mm,
-                                               save_dir,
-                                               feedrate_mm,
-                                               spindle_rpm,
-                                               final_height_mm)
         
-        
-        print("Generated Gcode file path:", gcode_file_path)
-        self.app.load(gcode_file_path)
-        print("Loaded Gcode file:", self.app.gcode.filename)
+        try:
+            gcode_file_path = setup_blender_scene(engrave_text,
+                                                  text_font,
+                                                   text_font_size,
+                                                   text_position_mm,
+                                                   rotation_degrees,
+                                                   layer_height_mm,
+                                                   safe_height_mm,
+                                                   save_dir,
+                                                   feedrate_mm,
+                                                   spindle_rpm,
+                                                   final_height_mm,
+                                                   work_area_width,
+                                                   work_area_height)
+            
+            print("Generated Gcode file path:", gcode_file_path)
+            
+            # Check if the file was actually created
+            if not os.path.exists(gcode_file_path):
+                messagebox.showerror(_("GCode Generation Error"), 
+                                   _("GCode file was not created successfully. Please check the parameters and try again."))
+                return
+                
+            self.app.load(gcode_file_path)
+            print("Loaded Gcode file:", self.app.gcode.filename)
+            
+        except Exception as e:
+            messagebox.showerror(_("GCode Generation Error"), 
+                               _("GCode generation failed. Please check the parameters and try again."))
+            print(f"GCode generation error: {e}")
+            import traceback
+            traceback.print_exc()
 
 
 
@@ -677,6 +722,8 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         Utils.setStr("SurfAlign", "textPositioningMode", self.textPositioning_var.get())
         Utils.setStr("SurfAlign", "lidName", self.lidName.get())
         Utils.setStr("SurfAlign", "lidList", ",".join(self.lid_list))
+        Utils.setFloat("SurfAlign", "centerOffsetX", self.center_offset_x.get())
+        Utils.setFloat("SurfAlign", "centerOffsetY", self.center_offset_y.get())
         Utils.setFloat("SurfAlign", "rotation", self.rotation.get())
         Utils.setFloat("SurfAlign", "feedrate", self.feedrate.get())
         Utils.setFloat("SurfAlign", "spindleRPM", self.spindleRPM.get())
@@ -689,7 +736,7 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
     def on_text_positioning_change(self, event):
         """Callback function to show/hide lid selector based on text positioning selection."""
         lid_positioning_mode = self.textPositioning_var.get()
-        lid_center_widgets = [self.lid_label, self.lidName_selector, self.edit_lid_button]
+        lid_center_widgets = [self.lid_label, self.lidName_selector, self.edit_lid_button, self.center_offset_label, self.center_offset_x, self.center_offset_y]
         pos_widgets = [self.pos_label, self.posX, self.posY]
         
         if lid_positioning_mode == "Lid Center":

@@ -63,7 +63,7 @@ def resolve_font_path(font_name):
 
 
 def setup_blender_scene(engrave_text, text_font, text_font_size, text_position_mm, rotation_degrees,
-                        layer_height_mm, safe_height_mm, save_dir, feedrate_mm, spindle_rpm, final_height_mm):
+                        layer_height_mm, safe_height_mm, save_dir, feedrate_mm, spindle_rpm, final_height_mm, work_area_width, work_area_height):
     blend_file_path = os.path.join(save_dir, "output.blend")
     # addon_name = "bl_ext.user_default.fabex"
 
@@ -96,6 +96,8 @@ def setup_blender_scene(engrave_text, text_font, text_font_size, text_position_m
 
         bpy.context.scene.cam_machine.output_tool_change = False  # Disable tool change command
         bpy.context.scene.cam_machine.eval_splitting = False  # Disable splitting g-code for large files
+        bpy.context.scene.cam_machine.working_area[0] = work_area_width/1000
+        bpy.context.scene.cam_machine.working_area[1] = work_area_height/1000
 
         # Remove all objects
         bpy.ops.object.select_all(action='SELECT')

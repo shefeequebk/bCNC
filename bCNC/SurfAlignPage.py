@@ -1276,7 +1276,7 @@ class MultiPointProbe(CNCRibbon.PageFrame):
             self.app.after(300, self._poll_probe_status)  # Check again in 100ms
         else:
             print("PROBING COMPLETED")
-            self.app.after(2000, self._process_alignment_results)
+            self.app.after(5000, self._process_alignment_results)
 
     def _process_alignment_results(self):
         

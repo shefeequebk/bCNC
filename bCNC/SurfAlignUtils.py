@@ -1,4 +1,5 @@
 import os
+import io
 
 # Redirect Blender's configuration, data, and scripts to your custom paths
 os.environ["BLENDER_USER_CONFIG"] = r""
@@ -70,11 +71,16 @@ def setup_blender_scene(engrave_text, text_font, text_font_size, text_position_m
     # Suppress warnings
     warnings.filterwarnings("ignore")
 
-    # Suppress print output
+    # Capture print output and errors
     original_stdout = sys.stdout
     original_stderr = sys.stderr
-    sys.stdout = open(os.devnull, 'w')
-    sys.stderr = open(os.devnull, 'w')
+    
+    # Create StringIO objects to capture output
+    stdout_capture = io.StringIO()
+    stderr_capture = io.StringIO()
+    
+    sys.stdout = stdout_capture
+    sys.stderr = stderr_capture
 
     try:
         # # Enable Addon
@@ -175,12 +181,29 @@ def setup_blender_scene(engrave_text, text_font, text_font_size, text_position_m
         # print("COMPLETED! GCODE is generated", blend_file_path)
 
     finally:
-        sys.stdout.close()
-        sys.stderr.close()
+        # Get captured output
+        captured_stdout = stdout_capture.getvalue()
+        captured_stderr = stderr_capture.getvalue()
+        
+        # Close the StringIO objects
+        stdout_capture.close()
+        stderr_capture.close()
+        
         # Restore original print output
         sys.stdout = original_stdout
         sys.stderr = original_stderr
         warnings.resetwarnings()
+        
+        # Print captured output and errors
+        if captured_stdout:
+            print("=== CAPTURED STDOUT ===")
+            print(captured_stdout)
+            print("=== END STDOUT ===")
+        
+        if captured_stderr:
+            print("=== CAPTURED STDERR ===")
+            print(captured_stderr)
+            print("=== END STDERR ===")
 
     return gcode_file_path
 

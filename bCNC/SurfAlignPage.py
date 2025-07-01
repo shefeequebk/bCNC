@@ -827,7 +827,7 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
             return _("Dimensions must be in format: {height}x{width}")
         
         try:
-            height, width = int(dimensions[0]), int(dimensions[1])
+            height, width = float(dimensions[0]), float(dimensions[1])
             if height <= 0 or width <= 0:
                 return _("Height and width must be positive numbers")
         except ValueError:
@@ -841,7 +841,7 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
             return None, None
         try:
             parts = lid_name.split('-')[1].split('x')
-            return int(parts[0]), int(parts[1])
+            return float(parts[0]), float(parts[1])
         except (IndexError, ValueError):
             return None, None
 
@@ -928,9 +928,9 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
             if len(dimensions) != 2:
                 return None, None
                 
-            # Convert to integers - format is "name-widthxheight"
-            width = int(dimensions[0])
-            height = int(dimensions[1])
+            # Convert to floats - format is "name-widthxheight"
+            width = float(dimensions[0])
+            height = float(dimensions[1])
             
             return width, height
             

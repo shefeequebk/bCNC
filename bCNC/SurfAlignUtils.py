@@ -63,7 +63,7 @@ def resolve_font_path(font_name):
     return None
 
 
-def setup_blender_scene(engrave_text, text_font, text_font_size, text_position_mm, rotation_degrees,
+def setup_blender_scene(engrave_text, font_path, text_font_size, text_position_mm, rotation_degrees,
                         layer_height_mm, safe_height_mm, save_dir, feedrate_mm, spindle_rpm, final_height_mm, work_area_width, work_area_height):
     blend_file_path = os.path.join(save_dir, "output.blend")
     # addon_name = "bl_ext.user_default.fabex"
@@ -116,15 +116,11 @@ def setup_blender_scene(engrave_text, text_font, text_font_size, text_position_m
         text_obj = bpy.context.object
         text_obj.data.body = engrave_text
 
-        if text_font:
-            font_path = resolve_windows_font_path(text_font)
+        if font_path:
             print("font_path", font_path)
-            if font_path:
-                vect_font = bpy.data.fonts.load(font_path)
-                text_obj.data.font = vect_font
-                print(f"Font '{text_font}' loaded successfully.")
-            else:
-                print(f"Font '{text_font}' not found.")
+            vect_font = bpy.data.fonts.load(font_path)
+            text_obj.data.font = vect_font
+            print(f"Font '{font_path}' loaded successfully.")
         else:
             print("No font selected.")
 
@@ -194,16 +190,16 @@ def setup_blender_scene(engrave_text, text_font, text_font_size, text_position_m
         sys.stderr = original_stderr
         warnings.resetwarnings()
         
-        # Print captured output and errors
-        if captured_stdout:
-            print("=== CAPTURED STDOUT ===")
-            print(captured_stdout)
-            print("=== END STDOUT ===")
+        # # Print captured output and errors
+        # if captured_stdout:
+        #     print("=== CAPTURED STDOUT ===")
+        #     print(captured_stdout)
+        #     print("=== END STDOUT ===")
         
-        if captured_stderr:
-            print("=== CAPTURED STDERR ===")
-            print(captured_stderr)
-            print("=== END STDERR ===")
+        # if captured_stderr:
+        #     print("=== CAPTURED STDERR ===")
+        #     print(captured_stderr)
+        #     print("=== END STDERR ===")
 
     return gcode_file_path
 

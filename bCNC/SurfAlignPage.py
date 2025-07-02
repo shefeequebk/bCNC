@@ -67,6 +67,7 @@ from tkinter import ttk
 import threading
 from tkinter import Tk, font
 import tkinter
+from fontTools.ttLib import TTFont
 
 __author__ = Utils.__author__
 __email__ = Utils.__email__
@@ -361,6 +362,70 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         except Exception as e:
             print("🛑 Error reading fonts:", e)
         return sorted(set(font_names))
+    
+    def get_font_name_style(self, font_path):
+        try:
+            font = TTFont(font_path, lazy=True)
+            name = ""
+            subfamily = ""
+            for record in font["name"].names:
+                if record.nameID == 1 and not name:
+                    name = record.toUnicode()
+                elif record.nameID == 2 and not subfamily:
+                    subfamily = record.toUnicode()
+            font.close()
+            return name, subfamily
+        except Exception as e:
+            print(f"⚠️ Failed to read {font_path}: {e}")
+            return None, None
+
+
+    def load_fonts_from_folder(self, folder):
+        font_dict = {}
+        for file in os.listdir(folder):
+            if file.lower().endswith(('.ttf', '.otf')):
+                font_path = os.path.join(folder, file)
+                family, style = self.get_font_name_style(font_path)
+                if family:
+                    key = f"{family} {style}".strip()
+                    font_dict[key] = font_path
+                    print(f"{file} => Family: {family}, Style: {style}")
+                else:
+                    print(f"{file} => Unable to read font name")
+                    pass
+        return font_dict
+    
+    def load_fonts_from_registry(self):
+        font_dict = {}
+        fonts_dir = os.path.join(os.environ["WINDIR"], "Fonts")
+
+        try:
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts") as key:
+                count = winreg.QueryInfoKey(key)[1]
+                for i in range(count):
+                    try:
+                        name, font_file, _ = winreg.EnumValue(key, i)
+                        if font_file.lower().endswith(('.ttf', '.otf')):
+                            font_path = os.path.join(fonts_dir, font_file)
+                            if os.path.exists(font_path):
+                                family, style = self.get_font_name_style(font_path)
+                                if family:
+                                    key_name = f"{family} {style}".strip()
+                                    if key_name not in font_dict:
+                                        font_dict[key_name] = font_path
+                                        # print(f"{font_file} => Family: {family}, Style: {style}")
+                                    else:
+                                        # print(f"{font_file} => Duplicate skipped: {family} {style}")
+                                        pass
+                                else:
+                                    # print(f"{font_file} => Unable to read font name")
+                                    pass
+                    except Exception as e:
+                        print(f"⚠️ Error processing registry entry: {e}")
+        except Exception as e:
+            print(f"⚠️ Failed to access Windows font registry: {e}")
+
+        return font_dict
 
     def __init__(self, master, app):
         CNCRibbon.PageFrame.__init__(self, master, "GenGcode", app)
@@ -398,8 +463,19 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         col = 0
         Label(lframe(), text=_("Font:")).grid(row=row, column=col, sticky=E)
         col += 1
+        
+        # Load fonts folders from config
+        fonts_folders_str = Utils.getStr("SurfAlign", "fontsFolders")
+        self.fonts_folders = [folder.strip() for folder in fonts_folders_str.split(",") if folder.strip()] if fonts_folders_str else []
+        
+        self.all_font_dict = {}
+        for fonts_folder in self.fonts_folders:
+            self.all_font_dict.update(self.load_fonts_from_folder(fonts_folder))
 
-        font_list = sorted(set(font.families()))
+        # 2️⃣ Load system fonts from registry
+        self.all_font_dict.update(self.load_fonts_from_registry())
+
+        font_list = sorted(set(self.all_font_dict.keys()))
 
         self.font_var = StringVar()
         self.font_selector = ttk.Combobox(
@@ -412,6 +488,14 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         self.font_selector.grid(row=row, column=col, sticky=EW)
         tkExtra.Balloon.set(self.font_selector, _("Select font for engraving text"))
         self.addWidget(self.font_selector)
+        
+        col += 1
+        
+        # Add Font Folder button
+        add_font_folder_button = Button(lframe(), text=_("Add Font Folder"), command=self.show_add_font_folder_dialog, padx=2, pady=1)
+        add_font_folder_button.grid(row=row, column=col, sticky=EW)
+        tkExtra.Balloon.set(add_font_folder_button, _("Add a new font folder path"))
+        self.addWidget(add_font_folder_button)
 
         # ----
         # Font Size 
@@ -658,6 +742,7 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
             text_font = None
         else:
             text_font = self.font_var.get()
+            font_path = self.all_font_dict.get(text_font)
         text_font_size = float(self.fontSize.get())
         lid_positioning_mode = self.textPositioning_var.get()
         if lid_positioning_mode == "Direct":
@@ -678,7 +763,7 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         
         try:
             gcode_file_path = setup_blender_scene(engrave_text,
-                                                  text_font,
+                                                  font_path,
                                                    text_font_size,
                                                    text_position_mm,
                                                    rotation_degrees,
@@ -731,6 +816,7 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         Utils.setFloat("SurfAlign", "layerHeight", self.layerHeight.get())
         Utils.setFloat("SurfAlign", "safeHeight", self.safeHeight.get())
         Utils.setFloat("SurfAlign", "finalHeight", self.finalHeight.get())
+        Utils.setStr("SurfAlign", "fontsFolders", ",".join(self.fonts_folders))
 
 
     def on_text_positioning_change(self, event):
@@ -901,6 +987,173 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         
         self.saveConfig()
         messagebox.showinfo(_("Success"), _("Lid name '{}' has been deleted from the list.").format(selected_lid), parent=dialog)
+
+    def show_add_font_folder_dialog(self):
+        """Show a popup dialog for adding font folder paths."""
+        dialog = Toplevel(self)
+        dialog.title(_("Add Font Folder"))
+        dialog.geometry("500x600")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+        dialog.geometry("+%d+%d" % (self.winfo_rootx() + 50, self.winfo_rooty() + 50))
+        
+        # Add new font folder section
+        add_frame = LabelFrame(dialog, text=_("Add New Font Folder"), padx=10, pady=10)
+        add_frame.pack(fill=X, padx=10, pady=(10, 5))
+        
+        Label(add_frame, text=_("Font Folder Path:")).grid(row=0, column=0, sticky=W, pady=(0, 5))
+        new_folder_entry = Entry(add_frame, background=tkExtra.GLOBAL_CONTROL_BACKGROUND, width=50)
+        new_folder_entry.grid(row=1, column=0, columnspan=2, sticky=EW, pady=(0, 5))
+        new_folder_entry.focus_set()
+        
+        # Browse button
+        browse_button = Button(add_frame, text=_("Browse"), command=lambda: self.browse_font_folder(new_folder_entry), padx=10, pady=2)
+        browse_button.grid(row=1, column=2, sticky=W, padx=(5, 0))
+        
+        Label(add_frame, text=_("Note: Folder should contain .ttf or .otf font files"), 
+              fg="blue", font=("TkDefaultFont", 8)).grid(row=2, column=0, columnspan=3, sticky=W, pady=(0, 5))
+        
+        add_button = Button(add_frame, text=_("Add"), command=lambda: self.add_font_folder_from_dialog(new_folder_entry.get().strip(), dialog, folder_listbox), padx=10, pady=2)
+        add_button.grid(row=3, column=0, sticky=W, pady=(5, 0))
+        
+        # Existing font folders section
+        existing_frame = LabelFrame(dialog, text=_("Existing Font Folders"), padx=10, pady=10)
+        existing_frame.pack(fill=BOTH, expand=True, padx=10, pady=(5, 10))
+        
+        # Listbox with scrollbar for existing folders
+        list_frame = Frame(existing_frame)
+        list_frame.pack(fill=BOTH, expand=True)
+        
+        folder_listbox = tkinter.Listbox(list_frame, height=8)
+        folder_listbox.pack(side=LEFT, fill=BOTH, expand=True)
+        
+        scrollbar = tkinter.Scrollbar(list_frame, orient=VERTICAL, command=folder_listbox.yview)
+        scrollbar.pack(side=RIGHT, fill=Y)
+        folder_listbox.config(yscrollcommand=scrollbar.set)
+        
+        # Populate listbox with existing folders
+        for folder in self.fonts_folders:
+            folder_listbox.insert(END, folder)
+        
+        # Delete button
+        delete_button = Button(existing_frame, text=_("Delete Selected"), 
+                              command=lambda: self.delete_font_folder_from_dialog(folder_listbox, dialog), 
+                              padx=10, pady=2, bg="#F44336", fg="white")
+        delete_button.pack(pady=(5, 0))
+        
+        # Bottom buttons
+        button_frame = Frame(dialog)
+        button_frame.pack(fill=X, padx=10, pady=(0, 10))
+        
+        Button(button_frame, text=_("Close"), command=dialog.destroy, padx=10, pady=2).pack(side=RIGHT)
+        
+        # Bind events
+        new_folder_entry.bind('<Return>', lambda event: self.add_font_folder_from_dialog(new_folder_entry.get().strip(), dialog, folder_listbox))
+        dialog.bind('<Escape>', lambda event: dialog.destroy())
+        
+        add_frame.columnconfigure(1, weight=1)
+
+    def browse_font_folder(self, entry_widget):
+        """Open a folder browser dialog to select a font folder."""
+        from tkinter import filedialog
+        folder_path = filedialog.askdirectory(title=_("Select Font Folder"))
+        if folder_path:
+            entry_widget.delete(0, END)
+            entry_widget.insert(0, folder_path)
+
+    def add_font_folder_from_dialog(self, new_folder_path, dialog, folder_listbox):
+        """Add a new font folder from the dialog."""
+        if not new_folder_path:
+            messagebox.showwarning(_("Empty Entry"), _("Please enter a folder path."), parent=dialog)
+            return
+        
+        if not os.path.exists(new_folder_path):
+            messagebox.showwarning(_("Invalid Path"), _("The specified folder does not exist."), parent=dialog)
+            return
+        
+        if not os.path.isdir(new_folder_path):
+            messagebox.showwarning(_("Invalid Path"), _("The specified path is not a folder."), parent=dialog)
+            return
+        
+        # Check if folder contains font files
+        font_files = [f for f in os.listdir(new_folder_path) if f.lower().endswith(('.ttf', '.otf'))]
+        if not font_files:
+            messagebox.showwarning(_("No Font Files"), _("The selected folder does not contain any .ttf or .otf font files."), parent=dialog)
+            return
+        
+        if new_folder_path in self.fonts_folders:
+            messagebox.showwarning(_("Duplicate Entry"), _("This font folder already exists in the list."), parent=dialog)
+            return
+
+        self.fonts_folders.append(new_folder_path)
+        
+        # Refresh the listbox
+        folder_listbox.delete(0, END)
+        for folder in self.fonts_folders:
+            folder_listbox.insert(END, folder)
+        
+        # Refresh fonts immediately after adding the folder
+        try:
+            # Reload fonts from all folders
+            self.all_font_dict = {}
+            for fonts_folder in self.fonts_folders:
+                self.all_font_dict.update(self.load_fonts_from_folder(fonts_folder))
+            
+            # Reload system fonts from registry
+            self.all_font_dict.update(self.load_fonts_from_registry())
+            
+            # Update the font selector
+            font_list = sorted(set(self.all_font_dict.keys()))
+            self.font_selector['values'] = font_list
+            
+            self.saveConfig()
+            messagebox.showinfo(_("Success"), _("Font folder '{}' has been added and fonts refreshed successfully.").format(new_folder_path), parent=dialog)
+        except Exception as e:
+            messagebox.showerror(_("Error"), _("Font folder added but failed to refresh fonts: {}").format(str(e)), parent=dialog)
+
+    def delete_font_folder_from_dialog(self, folder_listbox, dialog):
+        """Delete a selected font folder from the list."""
+        selected_index = folder_listbox.curselection()
+        if not selected_index:
+            messagebox.showwarning(_("No Selection"), _("Please select a font folder to delete."), parent=dialog)
+            return
+            
+        selected_folder = folder_listbox.get(selected_index[0])
+        
+        # Confirm deletion
+        if not messagebox.askyesno(_("Confirm Delete"), 
+                                  _("Are you sure you want to delete '{}'?").format(selected_folder), 
+                                  parent=dialog):
+            return
+            
+        self.fonts_folders.remove(selected_folder)
+        
+        # Refresh the listbox
+        folder_listbox.delete(0, END)
+        for folder in self.fonts_folders:
+            folder_listbox.insert(END, folder)
+        
+        # Refresh fonts immediately after deleting the folder
+        try:
+            # Reload fonts from all remaining folders
+            self.all_font_dict = {}
+            for fonts_folder in self.fonts_folders:
+                self.all_font_dict.update(self.load_fonts_from_folder(fonts_folder))
+            
+            # Reload system fonts from registry
+            self.all_font_dict.update(self.load_fonts_from_registry())
+            
+            # Update the font selector
+            font_list = sorted(set(self.all_font_dict.keys()))
+            self.font_selector['values'] = font_list
+            
+            self.saveConfig()
+            messagebox.showinfo(_("Success"), _("Font folder '{}' has been deleted and fonts refreshed successfully.").format(selected_folder), parent=dialog)
+        except Exception as e:
+            messagebox.showerror(_("Error"), _("Font folder deleted but failed to refresh fonts: {}").format(str(e)), parent=dialog)
+
+
 
     def get_lid_dimensions(self):
         """Extract width and height from the currently selected lid name in the selector.

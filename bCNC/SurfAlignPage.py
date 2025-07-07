@@ -1291,6 +1291,21 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         )
         self.addWidget(self.z_probe_to_tool_offset)
         
+        row += 1
+        col = 0
+        Label(frame, text=_("Step Size:")).grid(row=row, column=col, sticky=E)
+        col += 1
+        self.step_size = tkExtra.FloatEntry(
+            frame, background=tkExtra.GLOBAL_CONTROL_BACKGROUND
+        )
+        self.step_size.grid(row=row, column=col, sticky=EW)
+        tkExtra.Balloon.set(
+            self.step_size, _("Step size (mm) for the G-code generation when aligning with the surface (Making segments in straight lines).")
+        )
+        self.addWidget(self.step_size)
+        
+        
+        
         
         
         # --- Generate Probe & Show Probe Points & Start Probing ---
@@ -1407,6 +1422,7 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         self.y_probe_to_tool_offset.set(Utils.getFloat("SurfAlign", "y_probe_to_tool_offset"))
         self.z_probe_to_tool_offset.set(Utils.getFloat("SurfAlign", "z_probe_to_tool_offset"))
         self.z_safety_limit.set(Utils.getFloat("SurfAlign", "z_safety_limit"))
+        self.step_size.set(Utils.getFloat("SurfAlign", "step_size"))
         
     def saveConfig(self):
         Utils.setFloat("SurfAlign", "mp_z_min", self.mp_z_min.get())
@@ -1416,6 +1432,7 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         Utils.setFloat("SurfAlign", "y_probe_to_tool_offset", self.y_probe_to_tool_offset.get())
         Utils.setFloat("SurfAlign", "z_probe_to_tool_offset", self.z_probe_to_tool_offset.get())
         Utils.setFloat("SurfAlign", "z_safety_limit", self.z_safety_limit.get())
+        Utils.setFloat("SurfAlign", "step_size", self.step_size.get())
         
     def surface_align_gcode(self):
         if  self.x_probe_to_tool_offset.get() != "":
@@ -1431,7 +1448,7 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         else:
             self.app.gcode.z_probe_to_tool_offset = 0 
         # self.app.insertCommand("SURF_ALIGN", True)
-        bounds = self.app.gcode.surf_align_gcode(self.app.editor.getSelectedBlocks())
+        bounds = self.app.gcode.surf_align_gcode(self.app.editor.getSelectedBlocks(), step_size=float(self.step_size.get()))
         self.app.drawAfter()
     
     def generate_probe(self, show_plot=True):
@@ -1550,7 +1567,7 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         else:
             self.app.gcode.z_probe_to_tool_offset = 0
 
-        bounds = self.app.gcode.surf_align_gcode(self.app.editor.getAllBlocks())
+        bounds = self.app.gcode.surf_align_gcode(self.app.editor.getAllBlocks(), step_size=float(self.step_size.get()))
         self.app.drawAfter()
         print("Bounds: ", bounds)
         print("SURF ALIGN GCODE COMPLETED")

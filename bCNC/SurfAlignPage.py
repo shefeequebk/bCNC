@@ -1210,7 +1210,7 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         row, col = 0, 0
         Label(frame, text=_("No. of Points:")).grid(row=row, column=col, sticky=E)
         col += 1
-        self.n_probe_points = tkExtra.FloatEntry(
+        self.n_probe_points = tkExtra.IntegerEntry(
             frame, background=tkExtra.GLOBAL_CONTROL_BACKGROUND
         )
         self.n_probe_points.grid(row=row, column=col, sticky=EW)
@@ -1300,13 +1300,34 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         )
         self.step_size.grid(row=row, column=col, sticky=EW)
         tkExtra.Balloon.set(
-            self.step_size, _("Step size (mm) for the G-code generation when aligning with the surface (Making segments in straight lines).")
+            self.step_size, _("Distance between G-code points when creating surface-aligned toolpaths. Smaller values create smoother curves but more G-code commands. Use larger values when polynomial degree is 1 (flat plane).")
         )
         self.addWidget(self.step_size)
         
+        row += 1
+        col = 0
+        Label(frame, text=_("Poly Degree:")).grid(row=row, column=col, sticky=E)
+        col += 1
+        self.polynomial_degree = tkExtra.IntegerEntry(
+            frame, background=tkExtra.GLOBAL_CONTROL_BACKGROUND
+        )
+        self.polynomial_degree.grid(row=row, column=col, sticky=EW)
+        tkExtra.Balloon.set(
+            self.polynomial_degree, _("Degree of the polynomial surface to fit the probe points ( 1 = Flat plane).")
+        )
+        self.addWidget(self.polynomial_degree)
         
         
+        # Add validation status label
+        row += 1
+        col = 0
+        self.validation_status = Label(frame, text="", fg="gray", font=("TkDefaultFont", 8))
+        self.validation_status.grid(row=row, column=col, columnspan=3, sticky=W)
+        self.addWidget(self.validation_status)
         
+        # Bind validation updates
+        self.n_probe_points.bind('<KeyRelease>', self.update_validation_status)
+        self.polynomial_degree.bind('<KeyRelease>', self.update_validation_status)
         
         # --- Generate Probe & Show Probe Points & Start Probing ---
 
@@ -1417,22 +1438,27 @@ class MultiPointProbe(CNCRibbon.PageFrame):
     def loadConfig(self):
         self.mp_z_min.set(Utils.getFloat("SurfAlign", "mp_z_min"))
         self.mp_z_max.set(Utils.getFloat("SurfAlign", "mp_z_max"))
-        self.n_probe_points.set(Utils.getFloat("SurfAlign", "n_probe_points"))
+        self.n_probe_points.set(Utils.getInt("SurfAlign", "n_probe_points"))
         self.x_probe_to_tool_offset.set(Utils.getFloat("SurfAlign", "x_probe_to_tool_offset"))
         self.y_probe_to_tool_offset.set(Utils.getFloat("SurfAlign", "y_probe_to_tool_offset"))
         self.z_probe_to_tool_offset.set(Utils.getFloat("SurfAlign", "z_probe_to_tool_offset"))
         self.z_safety_limit.set(Utils.getFloat("SurfAlign", "z_safety_limit"))
         self.step_size.set(Utils.getFloat("SurfAlign", "step_size"))
+        self.polynomial_degree.set(Utils.getInt("SurfAlign", "polynomial_degree"))
+        
+        # Update validation status after loading config
+        self.update_validation_status()
         
     def saveConfig(self):
         Utils.setFloat("SurfAlign", "mp_z_min", self.mp_z_min.get())
         Utils.setFloat("SurfAlign", "mp_z_max", self.mp_z_max.get())
-        Utils.setFloat("SurfAlign", "n_probe_points", self.n_probe_points.get())
+        Utils.setInt("SurfAlign", "n_probe_points", self.n_probe_points.get())
         Utils.setFloat("SurfAlign", "x_probe_to_tool_offset", self.x_probe_to_tool_offset.get())
         Utils.setFloat("SurfAlign", "y_probe_to_tool_offset", self.y_probe_to_tool_offset.get())
         Utils.setFloat("SurfAlign", "z_probe_to_tool_offset", self.z_probe_to_tool_offset.get())
         Utils.setFloat("SurfAlign", "z_safety_limit", self.z_safety_limit.get())
         Utils.setFloat("SurfAlign", "step_size", self.step_size.get())
+        Utils.setInt("SurfAlign", "polynomial_degree", self.polynomial_degree.get())
         
     def surface_align_gcode(self):
         if  self.x_probe_to_tool_offset.get() != "":
@@ -1448,15 +1474,85 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         else:
             self.app.gcode.z_probe_to_tool_offset = 0 
         # self.app.insertCommand("SURF_ALIGN", True)
-        bounds = self.app.gcode.surf_align_gcode(self.app.editor.getSelectedBlocks(), step_size=float(self.step_size.get()))
+        
+        no_of_points = int(self.n_probe_points.get())
+        polynomial_degree = int(self.polynomial_degree.get())
+        
+        # Enhanced validation
+        is_valid, message, recommended_points = self.validate_probe_points_vs_degree(no_of_points, polynomial_degree)
+        
+        if not is_valid:
+            messagebox.showerror(_("Probe Configuration Error"), message)
+            return False
+        
+        bounds = self.app.gcode.surf_align_gcode(self.app.editor.getSelectedBlocks(), step_size=float(self.step_size.get()), degree=polynomial_degree)
         self.app.drawAfter()
     
+    def validate_probe_points_vs_degree(self, num_points, degree):
+        """
+        Validate if the number of probe points is sufficient for the polynomial degree.
+        
+        Args:
+            num_points (int): Number of probe points
+            degree (int): Polynomial degree
+            
+        Returns:
+            tuple: (is_valid, message, recommended_points)
+        """
+        # Calculate minimum points needed (number of coefficients)
+        min_points = (degree + 1) * (degree + 2) // 2
+        ratio = num_points / min_points
+        
+        # Basic validation: need at least as many points as coefficients
+        if num_points < min_points:
+            message = f"❌ Insufficient probe points for polynomial degree {degree}.\n" \
+                     f"   Need at least {min_points} points, but only {num_points} provided.\n" \
+                     f"   Recommended: {int(min_points * 1.2)} points for reliable fitting."
+            return False, message, int(min_points * 1.2)
+        
+        # Check for good ratio (at least 1.2)
+        if ratio >= 1.2:
+            message = f"✅ Good: {num_points} points for polynomial degree {degree} ({min_points} coefficients).\n" 
+            return True, message, None
+        
+        # Warning: ratio below 1.2
+        else:
+            message = f"⚠️  Warning: Low probe points for polynomial degree {degree}.\n"   
+            return True, message, int(min_points * 1.2)
+
+    def update_validation_status(self, event=None):
+        """Update the validation status display in real-time."""
+        try:
+            num_points = int(self.n_probe_points.get())
+            degree = int(self.polynomial_degree.get())
+            
+            is_valid, message, recommended_points = self.validate_probe_points_vs_degree(num_points, degree)
+            
+            # Extract the status part of the message
+            if "❌" in message:
+                self.validation_status.config(text=message.split('\n')[0], fg="red")
+            elif "⚠️" in message:
+                self.validation_status.config(text=message.split('\n')[0], fg="orange")
+            elif "✅" in message:
+                self.validation_status.config(text=message.split('\n')[0], fg="green")
+            else:
+                self.validation_status.config(text="", fg="gray")
+                
+        except (ValueError, TypeError):
+            self.validation_status.config(text="", fg="gray")
+
     def generate_probe(self, show_plot=True):
         
-        no_of_points = int(float(self.n_probe_points.get()))
-        if no_of_points < 3:
-            messagebox.showwarning(_("Probe error"), _("Number of probe points must be greater than 2"))
+        no_of_points = int(self.n_probe_points.get())
+        polynomial_degree = int(self.polynomial_degree.get())
+        
+        # Enhanced validation
+        is_valid, message, recommended_points = self.validate_probe_points_vs_degree(no_of_points, polynomial_degree)
+        
+        if not is_valid:
+            messagebox.showerror(_("Probe Configuration Error"), message)
             return False
+        
 
         self.probe_points = self.app.gcode.generate_and_plot_probing_points(method=self.probe_coverage_method.get(), k=no_of_points, show_plot=show_plot)
         if self.probe_points is None:
@@ -1516,6 +1612,17 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         return True
 
     def quick_align_run(self):
+        
+        no_of_points = int(self.n_probe_points.get())
+        polynomial_degree = int(self.polynomial_degree.get())
+        
+        # Enhanced validation
+        is_valid, message, recommended_points = self.validate_probe_points_vs_degree(no_of_points, polynomial_degree)
+        
+        if not is_valid:
+            messagebox.showerror(_("Probe Configuration Error"), message)
+            return False
+        
         self.stop_quick_align = False
         self._quick_align_thread()
 
@@ -1567,7 +1674,8 @@ class MultiPointProbe(CNCRibbon.PageFrame):
         else:
             self.app.gcode.z_probe_to_tool_offset = 0
 
-        bounds = self.app.gcode.surf_align_gcode(self.app.editor.getAllBlocks(), step_size=float(self.step_size.get()))
+        polynomial_degree = int(self.polynomial_degree.get())
+        bounds = self.app.gcode.surf_align_gcode(self.app.editor.getAllBlocks(), step_size=float(self.step_size.get()), degree=polynomial_degree)
         self.app.drawAfter()
         print("Bounds: ", bounds)
         print("SURF ALIGN GCODE COMPLETED")

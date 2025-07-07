@@ -3791,7 +3791,7 @@ class GCode:
                 terms.append((X ** i) * (Y ** j))
         return np.vstack(terms).T
 
-    def fit_polynomial_surface_numpy(self, points, degree=2):
+    def fit_polynomial_surface_numpy(self, points, degree=1):
         points = np.array(points)
         if points.ndim != 2 or points.shape[1] < 3:
             print("❌ Error: 'multi_probe_points' must be a list of 3D points (X, Y, Z)")
@@ -3880,17 +3880,16 @@ class GCode:
 
         return new, bounds
 
-    def surf_align_gcode(self, items, step_size=1):
+    def surf_align_gcode(self, items, step_size=1, degree=1):
         print("Surf Align G-Code")
 
         # self.probe.multi_probe_points = [[-3.861, 18.207, 0], [4.7, -22.876, -1], [-4.7, -3.686, 0],
-        #                                  [4.701, 7.0, -3], [4.701, -11, 2]]  # TODO: Remove this, test probe points
+        #                                  [4.701, 7.0, -3], [4.701, -11, 2],  [5.701, -12, 2.01]]  # TODO: Remove this, test probe points
 
         if self.probe.multi_probe_points is None or len(self.probe.multi_probe_points) < self.probe.no_of_points:
             print("No Multi-Point Probe Points, or not enough points")
             return None
 
-        degree = 1
         poly_plane_coeffs = self.fit_polynomial_surface_numpy(self.probe.multi_probe_points, degree=degree)
         if poly_plane_coeffs is None:
             print("❌ Polynomial fitting failed. Aborting surface align.")

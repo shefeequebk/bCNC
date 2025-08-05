@@ -67,6 +67,7 @@ from tkinter import ttk
 import threading
 from tkinter import Tk, font
 import tkinter
+import tkinter as tk
 from fontTools.ttLib import TTFont
 
 __author__ = Utils.__author__
@@ -454,9 +455,17 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         GenGcodeFrame.engraveText.grid(row=row, column=col, sticky=EW)
         tkExtra.Balloon.set(
             GenGcodeFrame.engraveText,
-            _("Set initial probe feed rate for tool change and calibration"),
+            _("Text to engrave. Use | to separate words with spacing. Use <|> for literal pipe character."),
         )
         self.addWidget(GenGcodeFrame.engraveText)
+
+        # Add info button for text syntax help
+        col += 1
+        info_button = Button(frame, text="ℹ", font=("TkDefaultFont", 8, "bold"), 
+                            command=self.show_text_syntax_help, width=2, height=1)
+        info_button.grid(row=row, column=col, sticky=W, padx=(2, 0))
+        tkExtra.Balloon.set(info_button, _("Click for detailed text syntax help"))
+        self.addWidget(info_button)
 
         # Font selection dropdown
         row += 1
@@ -509,6 +518,19 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         self.fontSize.grid(row=row, column=col, sticky=EW)
         tkExtra.Balloon.set(
             self.fontSize, _("Engrave Text Size"))
+        
+        # Add gap distance field for pipe-separated text
+        row += 1
+        col = 0
+        Label(frame, text=_("| Sep Gap (mm):")).grid(row=row, column=col, sticky=E)
+        col += 1
+        self.gapDistance = tkExtra.FloatEntry(
+            frame, background=tkExtra.GLOBAL_CONTROL_BACKGROUND
+        )
+        self.gapDistance.grid(row=row, column=col, sticky=EW)
+        tkExtra.Balloon.set(
+            self.gapDistance, _("Distance between words when using | separator in text"))
+        self.addWidget(self.gapDistance)
 
         row += 1
         col = 0
@@ -731,6 +753,7 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         self.layerHeight.set(Utils.getFloat("SurfAlign", "layerHeight"))
         self.safeHeight.set(Utils.getFloat("SurfAlign", "safeHeight"))
         self.finalHeight.set(Utils.getFloat("SurfAlign", "finalHeight"))
+        self.gapDistance.set(Utils.getFloat("SurfAlign", "gapDistance"))
         
         self.on_text_positioning_change(None)
         
@@ -760,6 +783,7 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         rotation_degrees = float(self.rotation.get())
         feedrate_mm = float(self.feedrate.get())
         spindle_rpm = float(self.spindleRPM.get())
+        gap_distance_mm = float(self.gapDistance.get())
         
         try:
             gcode_file_path = setup_blender_scene(engrave_text,
@@ -774,7 +798,8 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
                                                    spindle_rpm,
                                                    final_height_mm,
                                                    work_area_width,
-                                                   work_area_height)
+                                                   work_area_height,
+                                                   gap_distance_mm)
             
             print("Generated Gcode file path:", gcode_file_path)
             
@@ -816,6 +841,7 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
         Utils.setFloat("SurfAlign", "layerHeight", self.layerHeight.get())
         Utils.setFloat("SurfAlign", "safeHeight", self.safeHeight.get())
         Utils.setFloat("SurfAlign", "finalHeight", self.finalHeight.get())
+        Utils.setFloat("SurfAlign", "gapDistance", self.gapDistance.get())
         Utils.setStr("SurfAlign", "fontsFolders", ",".join(self.fonts_folders))
 
 
@@ -1189,6 +1215,54 @@ class GenGcodeFrame(CNCRibbon.PageFrame):
             
         except (ValueError, IndexError):
             return None, None
+
+    def show_text_syntax_help(self):
+        """Show a popup window with explanation of text syntax."""
+        help_window = tk.Toplevel(self)
+        help_window.title(_("Text Syntax Help"))
+        help_window.geometry("500x300")
+        help_window.resizable(False, False)
+        
+        # Make the window modal
+        help_window.transient(self)
+        help_window.grab_set()
+        
+        # Center the window
+        help_window.update_idletasks()
+        x = (help_window.winfo_screenwidth() // 2) - (500 // 2)
+        y = (help_window.winfo_screenheight() // 2) - (300 // 2)
+        help_window.geometry(f"500x300+{x}+{y}")
+        
+        # Main frame
+        main_frame = tk.Frame(help_window)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
+        
+        # Title
+        title_label = tk.Label(main_frame, text=_("Text Syntax Guide"), 
+                              font=("TkDefaultFont", 12, "bold"))
+        title_label.pack(pady=(0, 15))
+        
+        # Content frame
+        content_frame = tk.Frame(main_frame)
+        content_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Pipe separator section
+        tk.Label(content_frame, text=_("| = Word Spacing"), font=("TkDefaultFont", 10, "bold")).pack(anchor=tk.W)
+        tk.Label(content_frame, text="Hello|World → Two objects with spacing", font=("Courier", 9)).pack(anchor=tk.W, padx=(10, 0))
+        
+        # Literal pipe section
+        tk.Label(content_frame, text=_("<|> = Literal Pipe"), font=("TkDefaultFont", 10, "bold")).pack(anchor=tk.W, pady=(10, 0))
+        tk.Label(content_frame, text="Hello<|>World → Single object: 'Hello|World'", font=("Courier", 9)).pack(anchor=tk.W, padx=(10, 0))
+        
+        # Gap distance info
+        tk.Label(content_frame, text=_("Gap Distance: Use '| Sep Gap (mm)' field"), font=("TkDefaultFont", 10, "bold")).pack(anchor=tk.W, pady=(10, 0))
+        
+        # Close button
+        close_button = tk.Button(main_frame, text=_("Close"), command=help_window.destroy, width=8)
+        close_button.pack(pady=(15, 0))
+        
+        # Focus on the window
+        help_window.focus_set()
 
 class MultiPointProbe(CNCRibbon.PageFrame):
     def __init__(self, master, app):

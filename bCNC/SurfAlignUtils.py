@@ -64,7 +64,7 @@ def resolve_font_path(font_name):
 
 
 def setup_blender_scene(engrave_text, font_path, text_font_size, text_position_mm, rotation_degrees,
-                        layer_height_mm, safe_height_mm, save_dir, feedrate_mm, spindle_rpm, final_height_mm, work_area_width, work_area_height):
+                        layer_height_mm, safe_height_mm, save_dir, feedrate_mm, spindle_rpm, final_height_mm, work_area_width, work_area_height, gap_distance_mm=0.2):
     blend_file_path = os.path.join(save_dir, "output.blend")
     # addon_name = "bl_ext.user_default.fabex"
 
@@ -108,29 +108,105 @@ def setup_blender_scene(engrave_text, font_path, text_font_size, text_position_m
         # Remove all objects
         bpy.ops.object.select_all(action='SELECT')
         bpy.ops.object.delete(use_global=False)
-
-        # Add text object
-        bpy.ops.object.text_add(location=(0, 0, 0))
-        bpy.context.object.data.size = text_font_size/1000
         
-        text_obj = bpy.context.object
-        text_obj.data.body = engrave_text
+        temp_placeholder = "___PIPE_PLACEHOLDER___"
 
-        if font_path:
-            print("font_path", font_path)
-            vect_font = bpy.data.fonts.load(font_path)
-            text_obj.data.font = vect_font
-            print(f"Font '{font_path}' loaded successfully.")
+        # Check if text contains pipe separator for word spacing
+        # First, handle special case where <|> should be treated as literal | character
+        if '<|>' in engrave_text:
+            # Replace <|> with a temporary placeholder, then restore after splitting
+            engrave_text_processed = engrave_text.replace('<|>', temp_placeholder)
         else:
-            print("No font selected.")
+            engrave_text_processed = engrave_text
+            
+        if '|' in engrave_text_processed:
+            # Handle pipe-separated text with spacing
+            gap_distance = gap_distance_mm / 1000  # convert mm to meters
+            created_objects = []
+            
+            # Clear selection
+            bpy.ops.object.select_all(action='DESELECT')
+            
+            # Split the text by pipe character
+            parts = engrave_text_processed.split('|')
+            
+            # Restore <|> placeholders back to | characters
+            parts = [part.replace(temp_placeholder, '|') for part in parts]
+            
+            # Loop through each part and create separate text objects
+            x_offset = 0
+            for i, part in enumerate(parts):
+                # Add text object
+                bpy.ops.object.text_add(location=(x_offset, 0, 0))
+                text_obj = bpy.context.object
+                text_obj.data.body = part
+                text_obj.data.size = text_font_size/1000
+                text_obj.name = f"TextPart_{i}"
+                
+                # Apply font if available
+                if font_path:
+                    print(f"font_path for part {i}: {font_path}")
+                    vect_font = bpy.data.fonts.load(font_path)
+                    text_obj.data.font = vect_font
+                    print(f"Font '{font_path}' loaded successfully for part {i}.")
+                else:
+                    print(f"No font selected for part {i}.")
+                
+                # Convert to mesh
+                bpy.ops.object.convert(target='MESH')
+                
+                # Store reference
+                created_objects.append(text_obj)
+                
+                # Update scene to get accurate bounding box
+                bpy.context.view_layer.update()
+                bounds = text_obj.bound_box
+                width = abs(bounds[4][0] - bounds[0][0])  # X-axis width
+                x_offset += width + gap_distance
+            
+            # Join all created mesh objects into one
+            for obj in created_objects:
+                obj.select_set(True)
+            bpy.context.view_layer.objects.active = created_objects[0]
+            bpy.ops.object.join()
+            
+            # Rename final object
+            bpy.context.object.name = "Text"
+            text_obj = bpy.context.object
+            
+            # Get Actual Dimensions After Conversion
+            dimensions = text_obj.dimensions
+            print("Actual Dimensions After Conversion (Combined):", dimensions)
+            
+        else:
+            # Original single text object logic
+            # Add text object
+            bpy.ops.object.text_add(location=(0, 0, 0))
+            bpy.context.object.data.size = text_font_size/1000
+            
+            text_obj = bpy.context.object
+            # Use processed text (with <|> converted to | if needed)
+            # Restore placeholder back to | character if it exists
+            if '<|>' in engrave_text:
+                text_obj.data.body = engrave_text_processed.replace(temp_placeholder, '|')
+            else:
+                text_obj.data.body = engrave_text_processed
 
-        # Convert Text to Mesh to Get Accurate Dimensions
-        bpy.ops.object.convert(target='MESH')
-        bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
+            if font_path:
+                print("font_path", font_path)
+                vect_font = bpy.data.fonts.load(font_path)
+                text_obj.data.font = vect_font
+                print(f"Font '{font_path}' loaded successfully.")
+            else:
+                print("No font selected.")
 
-        # Get Actual Dimensions After Conversion
-        dimensions = text_obj.dimensions
-        print("Actual Dimensions After Conversion:", dimensions)
+            # Convert Text to Mesh to Get Accurate Dimensions
+            bpy.ops.object.convert(target='MESH')
+            bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
+
+            # Get Actual Dimensions After Conversion
+            dimensions = text_obj.dimensions
+            print("Actual Dimensions After Conversion:", dimensions)
 
 
         text_pos_meters = (text_position_mm[0] / 1000, text_position_mm[1] / 1000, text_position_mm[2] / 1000)

@@ -1,4 +1,4 @@
-pyserial==3.0.0
+pyserial==3.0.1
 numpy>=1.12
 Pillow==11.1.0
 opencv-python==4.5.5.64
